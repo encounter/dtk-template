@@ -50,6 +50,7 @@ class ProjectConfig:
         self.check_sha_path = None  # Path to version.sha1
         self.config_path = None  # Path to config.yml
         self.debug = False  # Build with debug info
+        self.generate_context = False  # Generate .ctx file(s)
         self.generate_map = False  # Generate map file(s)
         self.ldflags = None  # Linker flags
         self.libs = None  # List of libraries
@@ -340,6 +341,10 @@ def generate_build_ninja(config, build_config):
         mwcc_implicit.append(transform_dep)
         mwcc_sjis_implicit.append(transform_dep)
 
+    if config.generate_context:
+        mwcc_cmd += f" && $python tools/decompctx.py $in --relative --quiet"
+        mwcc_sjis_cmd += f" && $python tools/decompctx.py $in --relative --quiet"
+
     n.comment("Link ELF file")
     n.rule(
         name="link",
@@ -567,6 +572,9 @@ def generate_build_ninja(config, build_config):
                     implicit=path(
                         mwcc_sjis_implicit if options["shiftjis"] else mwcc_implicit
                     ),
+                    implicit_outputs=None
+                    if not config.generate_context
+                    else str(unit_src_path) + ".ctx",
                 )
 
                 if lib["host"]:

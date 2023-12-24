@@ -27,7 +27,7 @@ from tools.project import (
 # Game versions
 DEFAULT_VERSION = 0
 VERSIONS = [
-    "GAMEID",	# 0
+    "GAMEID",  # 0
 ]
 
 if len(VERSIONS) > 1:
@@ -66,6 +66,12 @@ parser.add_argument(
     dest="map",
     action="store_true",
     help="generate map file(s)",
+)
+parser.add_argument(
+    "--context",
+    dest="context",
+    action="store_true",
+    help="generate context file(s) for decomp.me",
 )
 parser.add_argument(
     "--debug",
@@ -111,6 +117,7 @@ config.build_dir = args.build_dir
 config.build_dtk_path = args.build_dtk
 config.compilers_path = args.compilers
 config.debug = args.debug
+config.generate_context = args.context
 config.generate_map = args.map
 config.sjiswrap_path = args.sjiswrap
 if not is_windows():
@@ -150,7 +157,7 @@ cflags_base = [
     "-RTTI off",
     "-fp_contract on",
     "-str reuse",
-	"-multibyte", # For Wii compilers, replace with `-enc SJIS`
+    "-multibyte",  # For Wii compilers, replace with `-enc SJIS`
     "-i include",
     f"-i build/{config.version}/include",
     f"-DVERSION={version_num}",
@@ -169,7 +176,7 @@ cflags_runtime = [
     "-str reuse,pool,readonly",
     "-gccinc",
     "-common off",
-	"-inline auto",
+    "-inline auto",
 ]
 
 # REL flags
