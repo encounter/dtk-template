@@ -31,11 +31,14 @@ if sys.platform == "cygwin":
 class ProjectConfig:
     def __init__(self):
         # Paths
-        self.build_dir = Path("build")
-        self.src_dir = Path("src")
-        self.tools_dir = Path("tools")
+        self.build_dir = Path("build")  # Output build files
+        self.src_dir = Path("src")  # C/C++/asm source files
+        self.tools_dir = Path("tools")  # Python scripts
+        self.asm_dir = Path("asm")  # Override incomplete objects (for modding)
 
         # Tooling
+        self.binutils_tag = None  # Git tag
+        self.binutils_path = None  # If None, download
         self.dtk_tag = None  # Git tag
         self.build_dtk_path = None  # If None, download
         self.compilers_tag = None  # 1
@@ -51,6 +54,7 @@ class ProjectConfig:
         self.config_path = None  # Path to config.yml
         self.debug = False  # Build with debug info
         self.generate_map = False  # Generate map file(s)
+        self.asflags = None  # Assembler flags
         self.ldflags = None  # Linker flags
         self.libs = None  # List of libraries
         self.linker_version = None  # mwld version
@@ -63,7 +67,9 @@ class ProjectConfig:
         # Progress output and progress.json config
         self.progress_all = True  # Include combined "all" category
         self.progress_modules = True  # Include combined "modules" category
-        self.progress_each_module = True  # Include individual modules, disable for large numbers of modules
+        self.progress_each_module = (
+            True  # Include individual modules, disable for large numbers of modules
+        )
 
         # Progress fancy printing
         self.progress_use_fancy = False
@@ -102,9 +108,12 @@ class ProjectConfig:
 class Object:
     def __init__(self, completed, name, **options):
         self.name = name
+        self.base_name = Path(name).with_suffix("")
         self.completed = completed
         self.options = {
             "add_to_all": True,
+            "asflags": None,
+            "extra_asflags": None,
             "cflags": None,
             "extra_cflags": None,
             "mw_version": None,
@@ -311,6 +320,26 @@ def generate_build_ninja(config, build_config):
                 "tag": config.compilers_tag,
             },
         )
+    else:
+        sys.exit("ProjectConfig.compilers_tag missing")
+
+    binutils_implicit = None
+    if config.binutils_path:
+        binutils = config.binutils_path
+    elif config.binutils_tag:
+        binutils = config.build_dir / "binutils"
+        binutils_implicit = binutils
+        n.build(
+            outputs=path(binutils),
+            rule="download_tool",
+            implicit=path(download_tool),
+            variables={
+                "tool": "binutils",
+                "tag": config.binutils_tag,
+            },
+        )
+    else:
+        sys.exit("ProjectConfig.binutils_tag missing")
 
     n.newline()
 
@@ -332,6 +361,14 @@ def generate_build_ninja(config, build_config):
     mwld = compiler_path / "mwldeppc.exe"
     mwld_cmd = f"{wrapper_cmd}{mwld} $ldflags -o $out @$out.rsp"
     mwld_implicit = [compilers_implicit or mwld, wrapper_implicit]
+
+    # GNU as
+    gnu_as = binutils / f"powerpc-eabi-as{EXE}"
+    gnu_as_cmd = (
+        f"{CHAIN}{gnu_as} $asflags -o $out $in -MD $out.d"
+        + f" && {dtk} elf fixup $out $out"
+    )
+    gnu_as_implicit = [binutils_implicit or gnu_as, dtk]
 
     if os.name != "nt":
         transform_dep = config.tools_dir / "transform_dep.py"
@@ -389,6 +426,16 @@ def generate_build_ninja(config, build_config):
     )
     n.newline()
 
+    n.comment("Assemble asm")
+    n.rule(
+        name="as",
+        command=gnu_as_cmd,
+        description="AS $out",
+        depfile="$out.d",
+        deps="gcc",
+    )
+    n.newline()
+
     n.comment("Host build")
     n.variable("host_cflags", "-I include -Wno-trigraphs")
     n.variable(
@@ -411,6 +458,7 @@ def generate_build_ninja(config, build_config):
     # Source files
     ###
     n.comment("Source files")
+    build_asm_path = build_path / "mod"
     build_src_path = build_path / "src"
     build_host_path = build_path / "host"
     build_config_path = build_path / "config.json"
@@ -515,6 +563,92 @@ def generate_build_ninja(config, build_config):
             else:
                 return cflags
 
+        def c_build(obj, options, lib_name, src_path):
+            cflags_str = make_cflags_str(options["cflags"])
+            if options["extra_cflags"] is not None:
+                extra_cflags_str = make_cflags_str(options["extra_cflags"])
+                cflags_str += " " + extra_cflags_str
+            used_compiler_versions.add(options["mw_version"])
+
+            src_obj_path = build_src_path / f"{obj.base_name}.o"
+            src_base_path = build_src_path / obj.base_name
+
+            # Avoid creating duplicate build rules
+            if src_obj_path in source_added:
+                return
+            source_added.add(src_obj_path)
+
+            # Add MWCC build rule
+            n.comment(f"{obj.name}: {lib_name} (linked {obj.completed})")
+            n.build(
+                outputs=path(src_obj_path),
+                rule="mwcc_sjis" if options["shiftjis"] else "mwcc",
+                inputs=path(src_path),
+                variables={
+                    "mw_version": path(Path(options["mw_version"])),
+                    "cflags": cflags_str,
+                    "basedir": os.path.dirname(src_base_path),
+                    "basefile": path(src_base_path),
+                },
+                implicit=path(
+                    mwcc_sjis_implicit if options["shiftjis"] else mwcc_implicit
+                ),
+            )
+
+            # Add host build rule
+            if options["host"]:
+                host_obj_path = build_host_path / f"{obj.base_name}.o"
+                host_base_path = build_host_path / obj.base_name
+                n.build(
+                    outputs=path(host_obj_path),
+                    rule="host_cc" if src_path.suffix == ".c" else "host_cpp",
+                    inputs=path(src_path),
+                    variables={
+                        "basedir": os.path.dirname(host_base_path),
+                        "basefile": path(host_base_path),
+                    },
+                )
+                if options["add_to_all"]:
+                    host_source_inputs.append(host_obj_path)
+            n.newline()
+
+            if options["add_to_all"]:
+                source_inputs.append(src_obj_path)
+
+            return src_obj_path
+
+        def asm_build(obj, options, lib_name, src_path):
+            asflags = options["asflags"] or config.asflags
+            if asflags is None:
+                sys.exit("ProjectConfig.asflags missing")
+            asflags_str = make_cflags_str(asflags)
+            if options["extra_asflags"] is not None:
+                extra_asflags_str = make_cflags_str(options["extra_asflags"])
+                asflags_str += " " + extra_asflags_str
+
+            asm_obj_path = build_asm_path / f"{obj.base_name}.o"
+
+            # Avoid creating duplicate build rules
+            if asm_obj_path in source_added:
+                return
+            source_added.add(asm_obj_path)
+
+            # Add assembler build rule
+            n.comment(f"{obj.name}: {lib_name} (linked {obj.completed})")
+            n.build(
+                outputs=path(asm_obj_path),
+                rule="as",
+                inputs=path(src_path),
+                variables={"asflags": asflags_str},
+                implicit=path(gnu_as_implicit),
+            )
+            n.newline()
+
+            if options["add_to_all"]:
+                source_inputs.append(asm_obj_path)
+
+            return asm_obj_path
+
         def add_unit(build_obj, link_step):
             obj_path, obj_name = build_obj["object"], build_obj["name"]
             result = config.find_object(obj_name)
@@ -526,71 +660,45 @@ def generate_build_ninja(config, build_config):
 
             lib, obj = result
             lib_name = lib["lib"]
-            src_dir = Path(lib.get("src_dir", config.src_dir))
 
-            options = obj.options
-            completed = obj.completed
+            # Use object options, then library options
+            options = lib.copy()
+            for key, value in obj.options.items():
+                if value is not None or key not in options:
+                    options[key] = value
 
-            unit_src_path = src_dir / options["source"]
+            unit_src_path = Path(lib.get("src_dir", config.src_dir)) / options["source"]
+            if config.asm_dir is not None:
+                unit_asm_path = (
+                    Path(lib.get("asm_dir", config.asm_dir)) / options["source"]
+                ).with_suffix(".s")
 
-            if not unit_src_path.exists():
-                if config.warn_missing_source or completed:
+            link_built_obj = obj.completed
+            if unit_src_path.exists():
+                if unit_src_path.suffix in (".c", ".cp", ".cpp"):
+                    # Add MWCC & host build rules
+                    built_obj_path = c_build(obj, options, lib_name, unit_src_path)
+                elif unit_src_path.suffix == ".s":
+                    # Add assembler build rule
+                    built_obj_path = asm_build(obj, options, lib_name, unit_src_path)
+                else:
+                    sys.exit(f"Unknown source file type {unit_src_path}")
+            else:
+                if config.warn_missing_source or obj.completed:
                     print(f"Missing source file {unit_src_path}")
+                link_built_obj = False
+
+            # Assembly overrides
+            if unit_asm_path is not None and unit_asm_path.exists():
+                link_built_obj = True
+                built_obj_path = asm_build(obj, options, lib_name, unit_asm_path)
+
+            if link_built_obj:
+                # Use the source-built object
+                link_step.add(built_obj_path)
+            else:
+                # Use the original (extracted) object
                 link_step.add(obj_path)
-                return
-
-            mw_version = options["mw_version"] or lib["mw_version"]
-            cflags_str = make_cflags_str(options["cflags"] or lib["cflags"])
-            if options["extra_cflags"] is not None:
-                extra_cflags_str = make_cflags_str(options["extra_cflags"])
-                cflags_str += " " + extra_cflags_str
-            used_compiler_versions.add(mw_version)
-
-            base_object = Path(obj.name).with_suffix("")
-            src_obj_path = build_src_path / f"{base_object}.o"
-            src_base_path = build_src_path / base_object
-
-            if src_obj_path not in source_added:
-                source_added.add(src_obj_path)
-
-                n.comment(f"{obj_name}: {lib_name} (linked {completed})")
-                n.build(
-                    outputs=path(src_obj_path),
-                    rule="mwcc_sjis" if options["shiftjis"] else "mwcc",
-                    inputs=path(unit_src_path),
-                    variables={
-                        "mw_version": path(Path(mw_version)),
-                        "cflags": cflags_str,
-                        "basedir": os.path.dirname(src_base_path),
-                        "basefile": path(src_base_path),
-                    },
-                    implicit=path(
-                        mwcc_sjis_implicit if options["shiftjis"] else mwcc_implicit
-                    ),
-                )
-
-                if lib["host"]:
-                    host_obj_path = build_host_path / f"{base_object}.o"
-                    host_base_path = build_host_path / base_object
-                    n.build(
-                        outputs=path(host_obj_path),
-                        rule="host_cc" if unit_src_path.suffix == ".c" else "host_cpp",
-                        inputs=path(unit_src_path),
-                        variables={
-                            "basedir": os.path.dirname(host_base_path),
-                            "basefile": path(host_base_path),
-                        },
-                    )
-                    if options["add_to_all"]:
-                        host_source_inputs.append(host_obj_path)
-                n.newline()
-
-                if options["add_to_all"]:
-                    source_inputs.append(src_obj_path)
-
-            if completed:
-                obj_path = src_obj_path
-            link_step.add(obj_path)
 
         # Add DOL link step
         link_step = LinkStep(build_config)
