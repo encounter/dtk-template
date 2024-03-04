@@ -27,7 +27,7 @@ from tools.project import (
 # Game versions
 DEFAULT_VERSION = 0
 VERSIONS = [
-    "GAMEID",	# 0
+    "GAMEID",  # 0
 ]
 
 if len(VERSIONS) > 1:
@@ -126,9 +126,9 @@ if not is_windows():
 # Tool versions
 config.binutils_tag = "2.41-1"
 config.compilers_tag = "20231018"
-config.dtk_tag = "v0.6.2"
+config.dtk_tag = "v0.7.2"
 config.sjiswrap_tag = "v1.1.1"
-config.wibo_tag = "0.6.9"
+config.wibo_tag = "0.6.11"
 
 # Project
 config.config_path = Path("config") / config.version / "config.yml"
@@ -137,7 +137,7 @@ config.asflags = [
     "-mgekko",
     # "-W",
     "--strip-local-absolute",
-    "-gdwarf-2",
+    # "-gdwarf-2",
     "-I include",
     f"-I build/{config.version}/include",
     f"--defsym version={version_num}",
@@ -167,7 +167,7 @@ cflags_base = [
     "-RTTI off",
     "-fp_contract on",
     "-str reuse",
-	"-multibyte", # For Wii compilers, replace with `-enc SJIS`
+    "-multibyte",  # For Wii compilers, replace with `-enc SJIS`
     "-i include",
     f"-i build/{config.version}/include",
     f"-DVERSION={version_num}",
@@ -186,7 +186,7 @@ cflags_runtime = [
     "-str reuse,pool,readonly",
     "-gccinc",
     "-common off",
-	"-inline auto",
+    "-inline auto",
 ]
 
 # REL flags

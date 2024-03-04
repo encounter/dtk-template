@@ -63,6 +63,7 @@ class ProjectConfig:
         self.warn_missing_source = False  # Warn on missing source file
         self.rel_strip_partial = True  # Generate PLFs with -strip_partial
         self.rel_empty_file = None  # Path to empty.c for generating empty RELs
+        self.shift_jis = True  # Use Shift JIS encoding for source files
 
         # Progress output and progress.json config
         self.progress_all = True  # Include combined "all" category
@@ -117,7 +118,7 @@ class Object:
             "cflags": None,
             "extra_cflags": None,
             "mw_version": None,
-            "shiftjis": True,
+            "shift_jis": None,
             "source": name,
         }
         self.options.update(options)
@@ -151,6 +152,14 @@ def path(value):
         return list(map(os_str, filter(lambda x: x is not None, value)))
     else:
         return [os_str(value)]
+
+
+# Stringify flags list
+def make_flags_str(cflags):
+    if isinstance(cflags, list):
+        return " ".join(cflags)
+    else:
+        return cflags
 
 
 # Load decomp-toolkit generated config.json
@@ -230,6 +239,13 @@ def generate_build_ninja(config, build_config):
         name="download_tool",
         command=f"$python {download_tool} $tool $out --tag $tag",
         description="TOOL $out",
+    )
+
+    decompctx = config.tools_dir / "decompctx.py"
+    n.rule(
+        name="decompctx",
+        command=f"$python {decompctx} $in $out",
+        description="CTX $in",
     )
 
     if config.build_dtk_path:
@@ -557,16 +573,10 @@ def generate_build_ninja(config, build_config):
         host_source_inputs = []
         source_added = set()
 
-        def make_cflags_str(cflags):
-            if isinstance(cflags, list):
-                return " ".join(cflags)
-            else:
-                return cflags
-
         def c_build(obj, options, lib_name, src_path):
-            cflags_str = make_cflags_str(options["cflags"])
+            cflags_str = make_flags_str(options["cflags"])
             if options["extra_cflags"] is not None:
-                extra_cflags_str = make_cflags_str(options["extra_cflags"])
+                extra_cflags_str = make_flags_str(options["extra_cflags"])
                 cflags_str += " " + extra_cflags_str
             used_compiler_versions.add(options["mw_version"])
 
@@ -578,11 +588,15 @@ def generate_build_ninja(config, build_config):
                 return
             source_added.add(src_obj_path)
 
+            shift_jis = options["shift_jis"]
+            if shift_jis is None:
+                shift_jis = config.shift_jis
+
             # Add MWCC build rule
             n.comment(f"{obj.name}: {lib_name} (linked {obj.completed})")
             n.build(
                 outputs=path(src_obj_path),
-                rule="mwcc_sjis" if options["shiftjis"] else "mwcc",
+                rule="mwcc_sjis" if shift_jis else "mwcc",
                 inputs=path(src_path),
                 variables={
                     "mw_version": path(Path(options["mw_version"])),
@@ -590,9 +604,7 @@ def generate_build_ninja(config, build_config):
                     "basedir": os.path.dirname(src_base_path),
                     "basefile": path(src_base_path),
                 },
-                implicit=path(
-                    mwcc_sjis_implicit if options["shiftjis"] else mwcc_implicit
-                ),
+                implicit=path(mwcc_sjis_implicit if shift_jis else mwcc_implicit),
             )
 
             # Add host build rule
@@ -621,9 +633,9 @@ def generate_build_ninja(config, build_config):
             asflags = options["asflags"] or config.asflags
             if asflags is None:
                 sys.exit("ProjectConfig.asflags missing")
-            asflags_str = make_cflags_str(asflags)
+            asflags_str = make_flags_str(asflags)
             if options["extra_asflags"] is not None:
-                extra_asflags_str = make_cflags_str(options["extra_asflags"])
+                extra_asflags_str = make_flags_str(options["extra_asflags"])
                 asflags_str += " " + extra_asflags_str
 
             asm_obj_path = build_asm_path / f"{obj.base_name}.o"
@@ -953,7 +965,7 @@ def generate_objdiff_config(config, build_config):
         return
 
     objdiff_config = {
-        "min_version": "0.4.3",
+        "min_version": "0.6.1",
         "custom_make": "ninja",
         "build_target": False,
         "watch_patterns": [
@@ -969,6 +981,36 @@ def generate_objdiff_config(config, build_config):
             "*.json",
         ],
         "units": [],
+    }
+
+    COMPILER_MAP = {
+        "GC/1.0": "mwcc_233_144",
+        "GC/1.1": "mwcc_233_159",
+        "GC/1.2.5": "mwcc_233_163",
+        "GC/1.2.5e": "mwcc_233_163e",
+        "GC/1.2.5n": "mwcc_233_163n",
+        "GC/1.3.2": "mwcc_242_81",
+        "GC/1.3.2r": "mwcc_242_81r",
+        "GC/2.0": "mwcc_247_92",
+        "GC/2.5": "mwcc_247_105",
+        "GC/2.6": "mwcc_247_107",
+        "GC/2.7": "mwcc_247_108",
+        "GC/3.0": "mwcc_41_60831",
+        "GC/3.0a3": "mwcc_41_51213",
+        "GC/3.0a3.2": "mwcc_41_60126",
+        "GC/3.0a3.3": "mwcc_41_60209",
+        "GC/3.0a3.4": "mwcc_42_60308",
+        "GC/3.0a5": "mwcc_42_60422",
+        "GC/3.0a5.2": "mwcc_41_60831",
+        "Wii/0x4201_127": "mwcc_42_142",
+        "Wii/1.0": "mwcc_43_145",
+        "Wii/1.0RC1": "mwcc_42_140",
+        "Wii/1.0a": "mwcc_42_142",
+        "Wii/1.1": "mwcc_43_151",
+        "Wii/1.3": "mwcc_43_172",
+        "Wii/1.5": "mwcc_43_188",
+        "Wii/1.6": "mwcc_43_202",
+        "Wii/1.7": "mwcc_43_213",
     }
 
     build_path = config.out_path()
@@ -1001,6 +1043,7 @@ def generate_objdiff_config(config, build_config):
 
         cflags = obj.options["cflags"] or lib["cflags"]
         src_obj_path = build_path / "src" / f"{base_object}.o"
+        src_ctx_path = build_path / "src" / f"{base_object}.ctx"
 
         reverse_fn_order = False
         if type(cflags) is list:
@@ -1016,6 +1059,16 @@ def generate_objdiff_config(config, build_config):
         unit_config["base_path"] = unix_str(src_obj_path)
         unit_config["reverse_fn_order"] = reverse_fn_order
         unit_config["complete"] = obj.completed
+        compiler_version = COMPILER_MAP.get(obj.options["mw_version"])
+        if compiler_version is None:
+            print(f"Missing decomp.me compiler mapping for {obj.options['mw_version']}")
+        else:
+            unit_config["decompme"] = {
+                "compiler": compiler_version,
+                "c_flags": make_flags_str(cflags),
+                "ctx_path": unix_str(src_ctx_path),
+                "build_ctx": True,
+            }
         objdiff_config["units"].append(unit_config)
 
     # Add DOL units
