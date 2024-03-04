@@ -16,6 +16,7 @@ import sys
 import argparse
 
 from pathlib import Path
+from typing import Dict, List, Any
 from tools.project import (
     Object,
     ProjectConfig,
@@ -124,9 +125,9 @@ if not is_windows():
     config.wrapper = args.wrapper
 
 # Tool versions
-config.binutils_tag = "2.41-1"
+config.binutils_tag = "2.42-1"
 config.compilers_tag = "20231018"
-config.dtk_tag = "v0.7.2"
+config.dtk_tag = "v0.7.4"
 config.sjiswrap_tag = "v1.1.1"
 config.wibo_tag = "0.6.11"
 
@@ -135,9 +136,7 @@ config.config_path = Path("config") / config.version / "config.yml"
 config.check_sha_path = Path("config") / config.version / "build.sha1"
 config.asflags = [
     "-mgekko",
-    # "-W",
     "--strip-local-absolute",
-    # "-gdwarf-2",
     "-I include",
     f"-I build/{config.version}/include",
     f"--defsym version={version_num}",
@@ -200,7 +199,7 @@ config.linker_version = "GC/1.3.2"
 
 
 # Helper function for Dolphin libraries
-def DolphinLib(lib_name, objects):
+def DolphinLib(lib_name: str, objects: List[Object]) -> Dict[str, Any]:
     return {
         "lib": lib_name,
         "mw_version": "GC/1.2.5n",
@@ -211,7 +210,7 @@ def DolphinLib(lib_name, objects):
 
 
 # Helper function for REL script objects
-def Rel(lib_name, objects):
+def Rel(lib_name: str, objects: List[Object]) -> Dict[str, Any]:
     return {
         "lib": lib_name,
         "mw_version": "GC/1.3.2",
