@@ -90,6 +90,9 @@ class ProjectConfig:
         self.shift_jis = (
             True  # Convert source files from UTF-8 to Shift JIS automatically
         )
+        self.reconfig_deps: Optional[List[Path]] = (
+            None  # Additional re-configuration dependency files
+        )
 
         # Progress output and progress.json config
         self.progress_all: bool = True  # Include combined "all" category
@@ -961,6 +964,7 @@ def generate_build_ninja(
             configure_script,
             python_lib,
             python_lib_dir / "ninja_syntax.py",
+            *(config.reconfig_deps or [])
         ],
     )
     n.newline()
