@@ -71,6 +71,7 @@ class ProjectConfig:
         self.sjiswrap_path: Optional[Path] = None  # If None, download
 
         # Project config
+        self.non_matching: bool = False
         self.build_rels: bool = True  # Build REL files
         self.check_sha_path: Optional[Path] = None  # Path to version.sha1
         self.config_path: Optional[Path] = None  # Path to config.yml
@@ -862,7 +863,7 @@ def generate_build_ninja(
         )
         n.build(
             outputs=ok_path,
-            rule="check",
+            rule="phony" if config.non_matching else "check",
             inputs=config.check_sha_path,
             implicit=[dtk, *map(lambda step: step.output(), link_steps)],
         )
@@ -879,7 +880,7 @@ def generate_build_ninja(
         )
         n.build(
             outputs=progress_path,
-            rule="progress",
+            rule="phony" if config.non_matching else "progress",
             implicit=[ok_path, configure_script, python_lib, config.config_path],
         )
 
