@@ -557,6 +557,7 @@ def generate_build_ninja(
                 )
             n.newline()
 
+    link_outputs: List[Path] = []
     if build_config:
         link_steps: List[LinkStep] = []
         used_compiler_versions: Set[str] = set()
@@ -764,6 +765,7 @@ def generate_build_ninja(
         ###
         for step in link_steps:
             step.write(n)
+            link_outputs.append(step.output())
         n.newline()
 
         ###
@@ -863,9 +865,9 @@ def generate_build_ninja(
         )
         n.build(
             outputs=ok_path,
-            rule="phony" if config.non_matching else "check",
+            rule="check",
             inputs=config.check_sha_path,
-            implicit=[dtk, *map(lambda step: step.output(), link_steps)],
+            implicit=[dtk, *link_outputs],
         )
         n.newline()
 
@@ -880,7 +882,7 @@ def generate_build_ninja(
         )
         n.build(
             outputs=progress_path,
-            rule="phony" if config.non_matching else "progress",
+            rule="progress",
             implicit=[ok_path, configure_script, python_lib, config.config_path],
         )
 
@@ -975,7 +977,10 @@ def generate_build_ninja(
     ###
     n.comment("Default rule")
     if build_config:
-        n.default(progress_path)
+        if config.non_matching:
+            n.default(link_outputs)
+        else:
+            n.default(progress_path)
     else:
         n.default(build_config_path)
 
