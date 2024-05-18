@@ -154,7 +154,7 @@ config.ldflags = [
     # "-listclosure", # Uncomment for Wii linkers
 ]
 # Use for any additional files that should cause a re-configure when modified
-# config.reconfig_deps = []
+config.reconfig_deps = []
 
 # Base flags, common to most GC/Wii games.
 # Generally leave untouched, with overrides added below.
