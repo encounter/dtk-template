@@ -10,6 +10,7 @@
 # https://github.com/encounter/dtk-template
 ###
 
+import enum
 import io
 import json
 import math
@@ -102,6 +103,20 @@ class ProgressCategory:
         self.name = name
 
 
+class DebugType(enum.IntEnum):
+    NONE = 0  # Build without debug information
+    DWARF_1 = 1  # Build with `-sym on`/`-g`
+    DWARF_2 = 2  # Build with `-sym dwarf-2`/`-gdwarf-2`
+
+    @staticmethod
+    def from_arg(arg: str):
+        if not arg:
+            return DebugType.NONE
+
+        options = {"dwarf-1": DebugType.DWARF_1, "dwarf-2": DebugType.DWARF_2}
+        return options[arg]
+
+
 class ProjectConfig:
     def __init__(self) -> None:
         # Paths
@@ -131,7 +146,7 @@ class ProjectConfig:
         self.build_rels: bool = True  # Build REL files
         self.check_sha_path: Optional[Path] = None  # Path to version.sha1
         self.config_path: Optional[Path] = None  # Path to config.yml
-        self.debug: bool = False  # Build with debug info
+        self.debug_type: DebugType = DebugType.NONE  # Debug info type
         self.generate_map: bool = False  # Generate map file(s)
         self.asflags: Optional[List[str]] = None  # Assembler flags
         self.ldflags: Optional[List[str]] = None  # Linker flags
@@ -286,8 +301,10 @@ def generate_build_ninja(
     ldflags = " ".join(config.ldflags or [])
     if config.generate_map:
         ldflags += " -mapunused"
-    if config.debug:
+    if config.debug_type == DebugType.DWARF_1:
         ldflags += " -g"
+    elif config.debug_type == DebugType.DWARF_2:
+        ldflags += " -gdwarf-2"
     n.variable("ldflags", ldflags)
     if config.linker_version is None:
         sys.exit("ProjectConfig.linker_version missing")

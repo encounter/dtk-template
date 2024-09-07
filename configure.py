@@ -66,7 +66,10 @@ parser.add_argument(
 )
 parser.add_argument(
     "--debug",
-    action="store_true",
+    dest="debug_type",
+    choices=["dwarf-1", "dwarf-2"],
+    const="dwarf-1",  # Only used when --debug is passed with no argument
+    nargs="?",
     help="build with debug info (non-matching)",
 )
 if not is_windows():
@@ -117,7 +120,9 @@ config.dtk_path = args.dtk
 config.objdiff_path = args.objdiff
 config.binutils_path = args.binutils
 config.compilers_path = args.compilers
-config.debug = args.debug
+config.debug_type = DebugType.from_arg(  # Set to a specific DebugType if needed
+    args.debug_type
+)
 config.generate_map = args.map
 config.non_matching = args.non_matching
 config.sjiswrap_path = args.sjiswrap
@@ -179,8 +184,10 @@ cflags_base = [
 ]
 
 # Debug flags
-if config.debug:
+if config.debug_type == DebugType.DWARF_1:
     cflags_base.extend(["-sym on", "-DDEBUG=1"])
+elif config.debug_type == DebugType.DWARF_2:
+    cflags_base.extend(["-sym dwarf-2", "-DDEBUG=1"])
 else:
     cflags_base.append("-DNDEBUG=1")
 
