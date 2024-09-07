@@ -283,12 +283,7 @@ def generate_build_ninja(
     # Variables
     ###
     n.comment("Variables")
-    ldflags = " ".join(config.ldflags or [])
-    if config.generate_map:
-        ldflags += " -mapunused"
-    if config.debug:
-        ldflags += " -g"
-    n.variable("ldflags", ldflags)
+    n.variable("ldflags", " ".join(config.ldflags or []))
     if config.linker_version is None:
         sys.exit("ProjectConfig.linker_version missing")
     n.variable("mw_version", Path(config.linker_version))
