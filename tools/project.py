@@ -17,26 +17,26 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union, cast
+from typing import Any, cast
 
 from . import ninja_syntax
 from .ninja_syntax import serialize_path
 
 if sys.platform == "cygwin":
     sys.exit(
-        f"Cygwin/MSYS2 is not supported."
-        f"\nPlease use native Windows Python instead."
-        f"\n(Current path: {sys.executable})"
+        "Cygwin/MSYS2 is not supported."
+        + f"\nPlease use native Windows Python instead."
+        + f"\n(Current path: {sys.executable})"
     )
 
-Library = Dict[str, Any]
+Library = dict[str, Any]
 
 
 class Object:
     def __init__(self, completed: bool, name: str, **options: Any) -> None:
         self.name = name
         self.completed = completed
-        self.options: Dict[str, Any] = {
+        self.options: dict[str, Any] = {
             "add_to_all": None,
             "asflags": None,
             "asm_dir": None,
@@ -54,12 +54,12 @@ class Object:
         self.options.update(options)
 
         # Internal
-        self.src_path: Optional[Path] = None
-        self.asm_path: Optional[Path] = None
-        self.src_obj_path: Optional[Path] = None
-        self.asm_obj_path: Optional[Path] = None
-        self.host_obj_path: Optional[Path] = None
-        self.ctx_path: Optional[Path] = None
+        self.src_path: Path | None = None
+        self.asm_path: Path | None = None
+        self.src_obj_path: Path | None = None
+        self.asm_obj_path: Path | None = None
+        self.host_obj_path: Path | None = None
+        self.ctx_path: Path | None = None
 
     def resolve(self, config: "ProjectConfig", lib: Library) -> "Object":
         # Use object options, then library options
@@ -108,51 +108,49 @@ class ProjectConfig:
         self.build_dir: Path = Path("build")  # Output build files
         self.src_dir: Path = Path("src")  # C/C++/asm source files
         self.tools_dir: Path = Path("tools")  # Python scripts
-        self.asm_dir: Optional[Path] = Path(
+        self.asm_dir: Path | None = Path(
             "asm"
         )  # Override incomplete objects (for modding)
 
         # Tooling
-        self.binutils_tag: Optional[str] = None  # Git tag
-        self.binutils_path: Optional[Path] = None  # If None, download
-        self.dtk_tag: Optional[str] = None  # Git tag
-        self.dtk_path: Optional[Path] = None  # If None, download
-        self.compilers_tag: Optional[str] = None  # 1
-        self.compilers_path: Optional[Path] = None  # If None, download
-        self.wibo_tag: Optional[str] = None  # Git tag
-        self.wrapper: Optional[Path] = None  # If None, download wibo on Linux
-        self.sjiswrap_tag: Optional[str] = None  # Git tag
-        self.sjiswrap_path: Optional[Path] = None  # If None, download
-        self.objdiff_tag: Optional[str] = None  # Git tag
-        self.objdiff_path: Optional[Path] = None  # If None, download
+        self.binutils_tag: str | None = None  # Git tag
+        self.binutils_path: Path | None = None  # If None, download
+        self.dtk_tag: str | None = None  # Git tag
+        self.dtk_path: Path | None = None  # If None, download
+        self.compilers_tag: str | None = None  # 1
+        self.compilers_path: Path | None = None  # If None, download
+        self.wibo_tag: str | None = None  # Git tag
+        self.wrapper: Path | None = None  # If None, download wibo on Linux
+        self.sjiswrap_tag: str | None = None  # Git tag
+        self.sjiswrap_path: Path | None = None  # If None, download
+        self.objdiff_tag: str | None = None  # Git tag
+        self.objdiff_path: Path | None = None  # If None, download
 
         # Project config
         self.non_matching: bool = False
         self.build_rels: bool = True  # Build REL files
-        self.check_sha_path: Optional[Path] = None  # Path to version.sha1
-        self.config_path: Optional[Path] = None  # Path to config.yml
+        self.check_sha_path: Path | None = None  # Path to version.sha1
+        self.config_path: Path | None = None  # Path to config.yml
         self.generate_map: bool = False  # Generate map file(s)
-        self.asflags: Optional[List[str]] = None  # Assembler flags
-        self.ldflags: Optional[List[str]] = None  # Linker flags
-        self.libs: Optional[List[Library]] = None  # List of libraries
-        self.linker_version: Optional[str] = None  # mwld version
-        self.version: Optional[str] = None  # Version name
+        self.asflags: list[str | None] = None  # Assembler flags
+        self.ldflags: list[str | None] = None  # Linker flags
+        self.libs: list[Library | None] = None  # list of libraries
+        self.linker_version: str | None = None  # mwld version
+        self.version: str | None = None  # Version name
         self.warn_missing_config: bool = False  # Warn on missing unit configuration
         self.warn_missing_source: bool = False  # Warn on missing source file
         self.rel_strip_partial: bool = True  # Generate PLFs with -strip_partial
-        self.rel_empty_file: Optional[str] = (
-            None  # Object name for generating empty RELs
-        )
+        self.rel_empty_file: str | None = None  # Object name for generating empty RELs
         self.shift_jis = (
             True  # Convert source files from UTF-8 to Shift JIS automatically
         )
-        self.reconfig_deps: Optional[List[Path]] = (
+        self.reconfig_deps: list[Path | None] = (
             None  # Additional re-configuration dependency files
         )
-        self.custom_build_rules: Optional[List[Dict[str, Any]]] = (
+        self.custom_build_rules: list[dict[str, Any | None]] = (
             None  # Custom ninja build rules
         )
-        self.custom_build_steps: Optional[Dict[str, List[Dict[str, Any]]]] = (
+        self.custom_build_steps: dict[str, list[dict[str, Any | None]]] = (
             None  # Custom build steps, types are ["pre-compile", "post-compile", "post-link", "post-build"]
         )
 
@@ -162,7 +160,7 @@ class ProjectConfig:
         self.progress_each_module: bool = (
             False  # Include individual modules, disable for large numbers of modules
         )
-        self.progress_categories: List[ProgressCategory] = []  # Additional categories
+        self.progress_categories: list[ProgressCategory] = []  # Additional categories
 
         # Progress fancy printing
         self.progress_use_fancy: bool = False
@@ -189,10 +187,10 @@ class ProjectConfig:
 
     # Creates a map of object names to Object instances
     # Options are fully resolved from the library and object
-    def objects(self) -> Dict[str, Object]:
+    def objects(self) -> dict[str, Object]:
         out = {}
         for lib in self.libs or {}:
-            objects: List[Object] = lib["objects"]
+            objects: list[Object] = lib["objects"]
             for obj in objects:
                 if obj.name in out:
                     sys.exit(f"Duplicate object name {obj.name}")
@@ -213,7 +211,7 @@ CHAIN = "cmd /c " if is_windows() else ""
 EXE = ".exe" if is_windows() else ""
 
 
-def make_flags_str(flags: Optional[Union[str, List[str]]]) -> str:
+def make_flags_str(flags: str | list[str] | None) -> str:
     if flags is None:
         return ""
     elif isinstance(flags, list):
@@ -225,7 +223,7 @@ def make_flags_str(flags: Optional[Union[str, List[str]]]) -> str:
 # Load decomp-toolkit generated config.json
 def load_build_config(
     config: ProjectConfig, build_config_path: Path
-) -> Optional[Dict[str, Any]]:
+) -> dict[str, Any | None]:
     if not build_config_path.is_file():
         return None
 
@@ -233,7 +231,7 @@ def load_build_config(
         return tuple(map(int, (v.split("."))))
 
     f = open(build_config_path, "r", encoding="utf-8")
-    build_config: Dict[str, Any] = json.load(f)
+    build_config: dict[str, Any] = json.load(f)
     config_version = build_config.get("version")
     if config_version is None:
         print("Invalid config.json, regenerating...")
@@ -264,8 +262,8 @@ def generate_build(config: ProjectConfig) -> None:
 # Generate build.ninja
 def generate_build_ninja(
     config: ProjectConfig,
-    objects: Dict[str, Object],
-    build_config: Optional[Dict[str, Any]],
+    objects: dict[str, Object],
+    build_config: dict[str, Any | None],
 ) -> None:
     out = io.StringIO()
     n = ninja_syntax.Writer(out)
@@ -407,7 +405,7 @@ def generate_build_ninja(
 
     # Only add an implicit dependency on wibo if we download it
     wrapper = config.wrapper
-    wrapper_implicit: Optional[Path] = None
+    wrapper_implicit: Path | None = None
     if (
         config.wibo_tag is not None
         and sys.platform == "linux"
@@ -429,7 +427,7 @@ def generate_build_ninja(
         wrapper = Path("wine")
     wrapper_cmd = f"{wrapper} " if wrapper else ""
 
-    compilers_implicit: Optional[Path] = None
+    compilers_implicit: Path | None = None
     if config.compilers_path:
         compilers = config.compilers_path
     elif config.compilers_tag:
@@ -486,16 +484,16 @@ def generate_build_ninja(
     # MWCC
     mwcc = compiler_path / "mwcceppc.exe"
     mwcc_cmd = f"{wrapper_cmd}{mwcc} $cflags -MMD -c $in -o $basedir"
-    mwcc_implicit: List[Optional[Path]] = [compilers_implicit or mwcc, wrapper_implicit]
+    mwcc_implicit: list[Path | None] = [compilers_implicit or mwcc, wrapper_implicit]
 
     # MWCC with UTF-8 to Shift JIS wrapper
     mwcc_sjis_cmd = f"{wrapper_cmd}{sjiswrap} {mwcc} $cflags -MMD -c $in -o $basedir"
-    mwcc_sjis_implicit: List[Optional[Path]] = [*mwcc_implicit, sjiswrap]
+    mwcc_sjis_implicit: list[Path | None] = [*mwcc_implicit, sjiswrap]
 
     # MWLD
     mwld = compiler_path / "mwldeppc.exe"
     mwld_cmd = f"{wrapper_cmd}{mwld} $ldflags -o $out @$out.rsp"
-    mwld_implicit: List[Optional[Path]] = [compilers_implicit or mwld, wrapper_implicit]
+    mwld_implicit: list[Path | None] = [compilers_implicit or mwld, wrapper_implicit]
 
     # GNU as
     gnu_as = binutils / f"powerpc-eabi-as{EXE}"
@@ -577,12 +575,12 @@ def generate_build_ninja(
         )
         n.newline()
 
-    def write_custom_step(step: str) -> List[str | Path]:
-        implicit: List[str | Path] = []
+    def write_custom_step(step: str) -> list[str | Path]:
+        implicit: list[str | Path] = []
         if config.custom_build_steps and step in config.custom_build_steps:
             n.comment(f"Custom build steps ({step})")
             for custom_step in config.custom_build_steps[step]:
-                outputs = cast(List[str | Path], custom_step.get("outputs"))
+                outputs = cast(list[str | Path], custom_step.get("outputs"))
 
                 if isinstance(outputs, list):
                     implicit.extend(outputs)
@@ -633,12 +631,12 @@ def generate_build_ninja(
         return path.parent / (path.name + ".MAP")
 
     class LinkStep:
-        def __init__(self, config: Dict[str, Any]) -> None:
+        def __init__(self, config: dict[str, Any]) -> None:
             self.name: str = config["name"]
             self.module_id: int = config["module_id"]
-            self.ldscript: Optional[Path] = Path(config["ldscript"])
+            self.ldscript: Path | None = Path(config["ldscript"])
             self.entry = config["entry"]
-            self.inputs: List[str] = []
+            self.inputs: list[str] = []
 
         def add(self, obj: Path) -> None:
             self.inputs.append(serialize_path(obj))
@@ -715,15 +713,15 @@ def generate_build_ninja(
                 )
             n.newline()
 
-    link_outputs: List[Path] = []
+    link_outputs: list[Path] = []
     if build_config:
-        link_steps: List[LinkStep] = []
+        link_steps: list[LinkStep] = []
         used_compiler_versions: Set[str] = set()
-        source_inputs: List[Path] = []
-        host_source_inputs: List[Path] = []
+        source_inputs: list[Path] = []
+        host_source_inputs: list[Path] = []
         source_added: Set[Path] = set()
 
-        def c_build(obj: Object, src_path: Path) -> Optional[Path]:
+        def c_build(obj: Object, src_path: Path) -> Path | None:
             cflags_str = make_flags_str(obj.options["cflags"])
             if obj.options["extra_cflags"] is not None:
                 extra_cflags_str = make_flags_str(obj.options["extra_cflags"])
@@ -783,8 +781,8 @@ def generate_build_ninja(
             return obj.src_obj_path
 
         def asm_build(
-            obj: Object, src_path: Path, obj_path: Optional[Path]
-        ) -> Optional[Path]:
+            obj: Object, src_path: Path, obj_path: Path | None
+        ) -> Path | None:
             if obj.options["asflags"] is None:
                 sys.exit("ProjectConfig.asflags missing")
             asflags_str = make_flags_str(obj.options["asflags"])
@@ -824,7 +822,7 @@ def generate_build_ninja(
                 return
 
             link_built_obj = obj.completed
-            built_obj_path: Optional[Path] = None
+            built_obj_path: Path | None = None
             if obj.src_path is not None and obj.src_path.exists():
                 if obj.src_path.suffix in (".c", ".cp", ".cpp"):
                     # Add MWCC & host build rules
@@ -932,7 +930,7 @@ def generate_build_ninja(
             rspfile="$rspfile",
             rspfile_content="$in_newline",
         )
-        generated_rels: List[str] = []
+        generated_rels: list[str] = []
         for idx, link in enumerate(build_config["links"]):
             # Map module names to link steps
             link_steps_local = list(
@@ -1048,7 +1046,7 @@ def generate_build_ninja(
             command=f"{objdiff} report generate -o $out",
             description="REPORT",
         )
-        report_implicit: List[str | Path] = [objdiff, "all_source"]
+        report_implicit: list[str | Path] = [objdiff, "all_source"]
         n.build(
             outputs=report_path,
             rule="report",
@@ -1163,13 +1161,13 @@ def generate_build_ninja(
 # Generate objdiff.json
 def generate_objdiff_config(
     config: ProjectConfig,
-    objects: Dict[str, Object],
-    build_config: Optional[Dict[str, Any]],
+    objects: dict[str, Object],
+    build_config: dict[str, Any | None],
 ) -> None:
     if build_config is None:
         return
 
-    objdiff_config: Dict[str, Any] = {
+    objdiff_config: dict[str, Any] = {
         "min_version": "2.0.0-beta.5",
         "custom_make": "ninja",
         "build_target": False,
@@ -1222,11 +1220,11 @@ def generate_objdiff_config(
     }
 
     def add_unit(
-        build_obj: Dict[str, Any], module_name: str, progress_categories: List[str]
+        build_obj: dict[str, Any], module_name: str, progress_categories: list[str]
     ) -> None:
         obj_path, obj_name = build_obj["object"], build_obj["name"]
         base_object = Path(obj_name).with_suffix("")
-        unit_config: Dict[str, Any] = {
+        unit_config: dict[str, Any] = {
             "name": Path(module_name) / base_object,
             "target_path": obj_path,
             "metadata": {
@@ -1291,7 +1289,7 @@ def generate_objdiff_config(
                         "build_ctx": True,
                     }
                 )
-        category_opt: List[str] | str = obj.options["progress_category"]
+        category_opt: list[str] | str = obj.options["progress_category"]
         if isinstance(category_opt, list):
             progress_categories.extend(category_opt)
         elif category_opt is not None:
@@ -1372,7 +1370,7 @@ def calculate_progress(config: ProjectConfig) -> None:
             self.objects: Set[Object] = set()
             self.objects_progress: int = 0
 
-        def add(self, build_obj: Dict[str, Any]) -> None:
+        def add(self, build_obj: dict[str, Any]) -> None:
             self.code_total += build_obj["code_size"]
             self.data_total += build_obj["data_size"]
 
@@ -1404,7 +1402,7 @@ def calculate_progress(config: ProjectConfig) -> None:
                 return 1.0
             return self.data_progress / self.data_total
 
-    progress_units: Dict[str, ProgressUnit] = {}
+    progress_units: dict[str, ProgressUnit] = {}
     if config.progress_all:
         progress_units["all"] = ProgressUnit("All")
     progress_units["dol"] = ProgressUnit("DOL")
@@ -1418,7 +1416,7 @@ def calculate_progress(config: ProjectConfig) -> None:
         for module in build_config["modules"]:
             progress_units[module["name"]] = ProgressUnit(module["name"])
 
-    def add_unit(id: str, unit: Dict[str, Any]) -> None:
+    def add_unit(id: str, unit: dict[str, Any]) -> None:
         progress = progress_units.get(id)
         if progress is not None:
             progress.add(unit)
@@ -1485,7 +1483,7 @@ def calculate_progress(config: ProjectConfig) -> None:
         )
 
     # Generate and write progress.json
-    progress_json: Dict[str, Any] = {}
+    progress_json: dict[str, Any] = {}
     for id, unit in progress_units.items():
         if len(unit.objects) == 0:
             continue
