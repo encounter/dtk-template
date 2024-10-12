@@ -251,6 +251,22 @@ CHAIN = "cmd /c " if is_windows() else ""
 EXE = ".exe" if is_windows() else ""
 
 
+def file_is_asm(path: Path) -> bool:
+    return path.suffix.lower() == ".s"
+
+
+def file_is_c(path: Path) -> bool:
+    return path.suffix.lower() == ".c"
+
+
+def file_is_cpp(path: Path) -> bool:
+    return path.suffix.lower() in (".cc", ".cp", ".cpp")
+
+
+def file_is_c_cpp(path: Path) -> bool:
+    return file_is_c(path) or file_is_cpp(path)
+
+
 def make_flags_str(flags: Optional[Union[str, List[str]]]) -> str:
     if flags is None:
         return ""
@@ -793,7 +809,7 @@ def generate_build_ninja(
             if obj.options["host"] and obj.host_obj_path is not None:
                 n.build(
                     outputs=obj.host_obj_path,
-                    rule="host_cc" if src_path.suffix == ".c" else "host_cpp",
+                    rule="host_cc" if file_is_c(src_path) else "host_cpp",
                     inputs=src_path,
                     variables={
                         "basedir": os.path.dirname(obj.host_obj_path),
@@ -853,10 +869,10 @@ def generate_build_ninja(
             link_built_obj = obj.completed
             built_obj_path: Optional[Path] = None
             if obj.src_path is not None and obj.src_path.exists():
-                if obj.src_path.suffix in (".c", ".cp", ".cpp"):
+                if file_is_c_cpp(obj.src_path):
                     # Add MWCC & host build rules
                     built_obj_path = c_build(obj, obj.src_path)
-                elif obj.src_path.suffix == ".s":
+                elif file_is_asm(obj.src_path):
                     # Add assembler build rule
                     built_obj_path = asm_build(obj, obj.src_path, obj.src_obj_path)
                 else:
@@ -1320,7 +1336,7 @@ def generate_objdiff_config(
             if obj.src_path is not None and not any(
                 flag.startswith("-lang") for flag in cflags
             ):
-                if obj.src_path.suffix in (".cp", ".cpp"):
+                if file_is_cpp(obj.src_path):
                     cflags.insert(0, "-lang=c++")
                 else:
                     cflags.insert(0, "-lang=c")
@@ -1541,7 +1557,7 @@ def generate_clangd_commands(
         if (
             obj.src_path is None
             or obj.src_obj_path is None
-            or obj.src_path.suffix not in (".c", ".cp", ".cpp")
+            or not file_is_c_cpp(obj.src_path)
         ):
             return
 
