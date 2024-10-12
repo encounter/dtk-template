@@ -1628,7 +1628,6 @@ def generate_clangd_commands(
             "directory": Path.cwd(),
             "file": in_path,
             "output": out_path,
-            # "command": mwcc_cmd,
             "arguments": [
                 *([wrapper, mwcc] if wrapper else [mwcc]),
                 *cflags,

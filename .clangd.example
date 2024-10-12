@@ -4,9 +4,6 @@ CompileFlags:
     # Remove all built-in definitions
     "-undef",
 
-    # Indicator for things which shouldn't be processed in IDEs
-    "-DDECOMP_IDE_FLAG",
-
     # No standard includes
     "-nostdinc",
     "-nostdinc++",
