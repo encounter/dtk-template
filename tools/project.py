@@ -1455,28 +1455,46 @@ def generate_clangd_commands(
     CFLAG_IGNORE_PREFIX: Tuple[str, ...] = tuple()
 
     # Flags to replace
-    CFLAG_REPLACE: Dict[str, Tuple[str, ...]] = {
-        # Exceptions
-        "-Cpp_exceptions off": ("-fno-cxx-exceptions",),
-        "-Cpp_exceptions on": ("-fcxx-exceptions",),
-        # RTTI
-        "-RTTI off": ("-fno-rtti",),
-        "-RTTI on": ("-frtti",),
-        # Language configuration
-        "-lang c": ("--language=c", "--std=c89"),
-        "-lang c99": ("--language=c", "--std=c99"),
-        "-lang c++": ("--language=c++", "--std=c++99"),
-        "-lang cplus": ("--language=c++", "--std=c++99"),
-    }
+    CFLAG_REPLACE: Dict[str, str] = {}
     CFLAG_REPLACE_PREFIX: Tuple[Tuple[str, str], ...] = (
-        # includes
+        # Includes
         ("-i ", "-I"),
         ("-I ", "-I"),
         ("-I+", "-I"),
-        # defines
+        # Defines
         ("-d ", "-D"),
         ("-D ", "-D"),
         ("-D+", "-D"),
+    )
+
+    # Flags with a finite set of options
+    CFLAG_REPLACE_OPTIONS: Tuple[Tuple[str, Dict[str, Tuple[str, ...]]], ...] = (
+        # Exceptions
+        (
+            "-Cpp_exceptions",
+            {
+                "off": ("-fno-cxx-exceptions",),
+                "on": ("-fcxx-exceptions",),
+            },
+        ),
+        # RTTI
+        (
+            "-RTTI",
+            {
+                "off": ("-fno-rtti",),
+                "on": ("-frtti",),
+            },
+        ),
+        # Language configuration
+        (
+            "-lang",
+            {
+                "c": ("--language=c", "--std=c89"),
+                "c99": ("--language=c", "--std=c99"),
+                "c++": ("--language=c++", "--std=c++99"),
+                "cplus": ("--language=c++", "--std=c++99"),
+            },
+        ),
     )
 
     # Flags to pass through
@@ -1588,14 +1606,27 @@ def generate_clangd_commands(
 
             # Attempts replacement for the given flag.
             def try_replace(flag: str) -> bool:
-                if flag in CFLAG_REPLACE:
-                    cflags.extend(CFLAG_REPLACE[flag])
+                replacement = CFLAG_REPLACE.get(flag)
+                if replacement is not None:
+                    cflags.append(replacement)
                     return True
 
                 for prefix, replacement in CFLAG_REPLACE_PREFIX:
                     if flag.startswith(prefix):
                         cflags.append(flag.replace(prefix, replacement, 1))
                         return True
+
+                for prefix, options in CFLAG_REPLACE_OPTIONS:
+                    if not flag.startswith(prefix):
+                        continue
+
+                    # "-lang c99" and "-lang=c99" are both generally valid option forms
+                    option = flag.removeprefix(prefix).removeprefix("=").lstrip()
+                    replacements = options.get(option)
+                    if replacements is not None:
+                        cflags.extend(replacements)
+
+                    return True
 
                 return False
 
