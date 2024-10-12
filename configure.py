@@ -169,6 +169,10 @@ if args.map:
     config.ldflags.append("-mapunused")
     # config.ldflags.append("-listclosure") # For Wii linkers
 
+# Options for generating clangd compile_commands.json
+config.make_clangd_config = False
+config.clangd_compiler_defines = False
+
 # Use for any additional files that should cause a re-configure when modified
 config.reconfig_deps = []
 
