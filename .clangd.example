@@ -12,21 +12,3 @@ CompileFlags:
     # Target definitions
     "--target=ppc32-unknown-eabi",
   ]
----
-# C files
-If:
-  PathMatch: .*\.c
-CompileFlags:
-  Add: [
-    "--language=c",
-    "-std=c99",
-  ]
----
-# C++ files
-If:
-  PathMatch: .*\.cpp?
-CompileFlags:
-  Add: [
-    "--language=c++",
-    "-std=c++03",
-  ]
