@@ -169,8 +169,6 @@ if args.map:
     config.ldflags.append("-mapunused")
     # config.ldflags.append("-listclosure") # For Wii linkers
 
-config.make_clangd_config = False
-
 # Use for any additional files that should cause a re-configure when modified
 config.reconfig_deps = []
 

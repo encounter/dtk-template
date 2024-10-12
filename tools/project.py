@@ -17,7 +17,7 @@ import os
 import platform
 import sys
 from pathlib import Path
-from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, Union, cast
+from typing import IO, Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 from . import ninja_syntax
 from .ninja_syntax import serialize_path
@@ -155,8 +155,8 @@ class ProjectConfig:
         self.custom_build_steps: Optional[Dict[str, List[Dict[str, Any]]]] = (
             None  # Custom build steps, types are ["pre-compile", "post-compile", "post-link", "post-build"]
         )
-        self.make_clangd_config: bool = (
-            False  # Generate compile_commands.json for clangd
+        self.generate_compile_commands: bool = (
+            True  # Generate compile_commands.json for clangd
         )
 
         # Progress output, progress.json and report.json config
@@ -257,20 +257,17 @@ def file_is_c(path: Path) -> bool:
 
 
 def file_is_cpp(path: Path) -> bool:
-    return path.suffix.lower() in (".cc", ".cp", ".cpp")
+    return path.suffix.lower() in (".cc", ".cp", ".cpp", ".cxx")
 
 
 def file_is_c_cpp(path: Path) -> bool:
     return file_is_c(path) or file_is_cpp(path)
 
 
-def make_flags_str(flags: Optional[Union[str, List[str]]]) -> str:
+def make_flags_str(flags: Optional[List[str]]) -> str:
     if flags is None:
         return ""
-    elif isinstance(flags, list):
-        return " ".join(flags)
-    else:
-        return flags
+    return " ".join(flags)
 
 
 # Load decomp-toolkit generated config.json
@@ -303,14 +300,14 @@ def load_build_config(
     return build_config
 
 
-# Generate build.ninja and objdiff.json
+# Generate build.ninja, objdiff.json and compile_commands.json
 def generate_build(config: ProjectConfig) -> None:
     config.validate()
     objects = config.objects()
     build_config = load_build_config(config, config.out_path() / "config.json")
     generate_build_ninja(config, objects, build_config)
     generate_objdiff_config(config, objects, build_config)
-    generate_clangd_commands(config, objects, build_config)
+    generate_compile_commands(config, objects, build_config)
 
 
 # Generate build.ninja
@@ -699,7 +696,6 @@ def generate_build_ninja(
             n.comment(f"Link {self.name}")
             if self.module_id == 0:
                 elf_path = build_path / f"{self.name}.elf"
-                dol_path = build_path / f"{self.name}.dol"
                 elf_ldflags = f"$ldflags -lcf {serialize_path(self.ldscript)}"
                 if config.generate_map:
                     elf_map = map_path(elf_path)
@@ -1332,21 +1328,20 @@ def generate_objdiff_config(
 
         cflags = obj.options["cflags"]
         reverse_fn_order = False
-        if type(cflags) is list:
-            for flag in cflags:
-                if not flag.startswith("-inline "):
-                    continue
-                for value in flag.split(" ")[1].split(","):
-                    if value == "deferred":
-                        reverse_fn_order = True
-                    elif value == "nodeferred":
-                        reverse_fn_order = False
+        for flag in cflags:
+            if not flag.startswith("-inline "):
+                continue
+            for value in flag.split(" ")[1].split(","):
+                if value == "deferred":
+                    reverse_fn_order = True
+                elif value == "nodeferred":
+                    reverse_fn_order = False
 
-            # Filter out include directories
-            def keep_flag(flag):
-                return not flag.startswith("-i ") and not flag.startswith("-I ")
+        # Filter out include directories
+        def keep_flag(flag):
+            return not flag.startswith("-i ") and not flag.startswith("-I ")
 
-            cflags = list(filter(keep_flag, cflags))
+        cflags = list(filter(keep_flag, cflags))
 
         compiler_version = COMPILER_MAP.get(obj.options["mw_version"])
         if compiler_version is None:
@@ -1437,19 +1432,16 @@ def generate_objdiff_config(
         json.dump(cleandict(objdiff_config), w, indent=2, default=unix_path)
 
 
-def generate_clangd_commands(
+def generate_compile_commands(
     config: ProjectConfig,
     objects: Dict[str, Object],
     build_config: Optional[Dict[str, Any]],
 ) -> None:
-    if build_config is None or not config.make_clangd_config:
+    if build_config is None or not config.generate_compile_commands:
         return
 
-    compilers = config.compilers()
-    wrapper = config.compiler_wrapper()
-
-    # clangd complains about unsupported cflags,
-    # so we need to apply some processing to make it happy.
+    # The following code attempts to convert mwcc flags to clang flags
+    # for use with clangd.
 
     # Flags to ignore explicitly
     CFLAG_IGNORE: Set[str] = {
@@ -1498,8 +1490,8 @@ def generate_clangd_commands(
             {
                 "c": ("--language=c", "--std=c89"),
                 "c99": ("--language=c", "--std=c99"),
-                "c++": ("--language=c++", "--std=c++99"),
-                "cplus": ("--language=c++", "--std=c++99"),
+                "c++": ("--language=c++", "--std=c++98"),
+                "cplus": ("--language=c++", "--std=c++98"),
             },
         ),
     )
@@ -1591,34 +1583,24 @@ def generate_clangd_commands(
                     cflags.append(flag)
                     continue
 
-        # Since we need to do processing on individual flags, cflag strings are not supported
-        if not isinstance(obj.options["cflags"], list):
-            print(
-                f"clangd config generation does not support cflags as a single string: {obj.src_path}"
-            )
-            return
         append_cflags(obj.options["cflags"])
-
         if isinstance(obj.options["extra_cflags"], list):
             append_cflags(obj.options["extra_cflags"])
 
-        mwcc = compilers / Path(obj.options["mw_version"]) / "mwcceppc.exe"
-
-        in_path = obj.src_path
-        out_path = obj.src_obj_path
-
         unit_config = {
             "directory": Path.cwd(),
-            "file": in_path,
-            "output": out_path,
+            "file": obj.src_path,
+            "output": obj.src_obj_path,
             "arguments": [
-                *([wrapper, mwcc] if wrapper else [mwcc]),
+                "clang",
+                "-nostdinc",
+                "-fno-builtin",
+                "--target=powerpc-none-eabi",
                 *cflags,
-                "-MMD",
                 "-c",
-                in_path,
+                obj.src_path,
                 "-o",
-                out_path.parent,
+                obj.src_obj_path,
             ],
         }
         clangd_config.append(unit_config)

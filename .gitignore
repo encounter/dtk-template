@@ -1,7 +1,6 @@
 # IDE folders
 .idea/
 .vs/
-.vscode/
 
 # Caches
 __pycache__
@@ -11,6 +10,12 @@ __pycache__
 # Original files
 orig/*/*
 !orig/*/.gitkeep
+*.dol
+*.rel
+*.elf
+*.o
+*.map
+*.MAP
 
 # Build files
 build/
