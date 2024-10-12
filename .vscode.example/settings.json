@@ -13,7 +13,8 @@
     "files.insertFinalNewline": true,
     "files.trimFinalNewlines": true,
     "files.associations": {
-        "*.inc": "cpp"
+        "*.inc": "cpp",
+        ".clangd": "yaml"
     },
     "search.useIgnoreFiles": false,
     "search.exclude": {

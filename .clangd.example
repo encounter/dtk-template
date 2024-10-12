@@ -1,0 +1,35 @@
+# Global config for all files
+CompileFlags:
+  Add: [
+    # Remove all built-in definitions
+    "-undef",
+
+    # Indicator for things which shouldn't be processed in IDEs
+    "-DDECOMP_IDE_FLAG",
+
+    # No standard includes
+    "-nostdinc",
+    "-nostdinc++",
+    "-fno-builtin",
+
+    # Target definitions
+    "--target=ppc32-unknown-eabi",
+  ]
+---
+# C files
+If:
+  PathMatch: .*\.c
+CompileFlags:
+  Add: [
+    "--language=c",
+    "-std=c99",
+  ]
+---
+# C++ files
+If:
+  PathMatch: .*\.cpp?
+CompileFlags:
+  Add: [
+    "--language=c++",
+    "-std=c++03",
+  ]
