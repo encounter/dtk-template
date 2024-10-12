@@ -1657,7 +1657,7 @@ def generate_clangd_commands(
                 return o.resolve().as_posix()
             return str(o)
 
-        json.dump(clangd_config, w, indent=4, default=default_format)
+        json.dump(clangd_config, w, indent=2, default=default_format)
 
 
 # Calculate, print and write progress to progress.json
