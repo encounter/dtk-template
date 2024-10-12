@@ -767,16 +767,35 @@ def generate_build_ninja(
         source_added: Set[Path] = set()
 
         def c_build(obj: Object, src_path: Path) -> Optional[Path]:
-            cflags_str = make_flags_str(obj.options["cflags"])
-            if obj.options["extra_cflags"] is not None:
-                extra_cflags_str = make_flags_str(obj.options["extra_cflags"])
-                cflags_str += " " + extra_cflags_str
-            used_compiler_versions.add(obj.options["mw_version"])
-
             # Avoid creating duplicate build rules
             if obj.src_obj_path is None or obj.src_obj_path in source_added:
                 return obj.src_obj_path
             source_added.add(obj.src_obj_path)
+
+            cflags = obj.options["cflags"]
+            extra_cflags = obj.options["extra_cflags"]
+
+            # Add appropriate language flag if it doesn't exist already
+            # Added directly to the source so it flows to other generation tasks
+            if not any(flag.startswith("-lang") for flag in cflags) and (
+                extra_cflags is None
+                or not any(flag.startswith("-lang") for flag in extra_cflags)
+            ):
+                # Ensure extra_cflags is a unique instance,
+                # and insert into there to avoid modifying shared sets of flags
+                if extra_cflags is None:
+                    extra_cflags = []
+                extra_cflags = obj.options["extra_cflags"] = list(extra_cflags)
+                if file_is_cpp(src_path):
+                    extra_cflags.insert(0, "-lang=c++")
+                else:
+                    extra_cflags.insert(0, "-lang=c")
+
+            cflags_str = make_flags_str(cflags)
+            if extra_cflags is not None:
+                extra_cflags_str = make_flags_str(extra_cflags)
+                cflags_str += " " + extra_cflags_str
+            used_compiler_versions.add(obj.options["mw_version"])
 
             # Add MWCC build rule
             lib_name = obj.options["lib"]
@@ -1331,15 +1350,6 @@ def generate_objdiff_config(
                 return not flag.startswith("-i ") and not flag.startswith("-I ")
 
             cflags = list(filter(keep_flag, cflags))
-
-            # Add appropriate lang flag
-            if obj.src_path is not None and not any(
-                flag.startswith("-lang") for flag in cflags
-            ):
-                if file_is_cpp(obj.src_path):
-                    cflags.insert(0, "-lang=c++")
-                else:
-                    cflags.insert(0, "-lang=c")
 
         compiler_version = COMPILER_MAP.get(obj.options["mw_version"])
         if compiler_version is None:
