@@ -91,6 +91,21 @@ TOOLS: Dict[str, Callable[[str], str]] = {
     "wibo": wibo_url,
 }
 
+def download(url, response, output) -> None:
+    if url.endswith(".zip"):
+        data = io.BytesIO(response.read())
+        with zipfile.ZipFile(data) as f:
+            f.extractall(output)
+        # Make all files executable
+        for root, _, files in os.walk(output):
+            for name in files:
+                os.chmod(os.path.join(root, name), 0o755)
+        output.touch(mode=0o755)  # Update dir modtime
+    else:
+        with open(output, "wb") as f:
+            shutil.copyfileobj(response, f)
+        st = os.stat(output)
+        os.chmod(output, st.st_mode | stat.S_IEXEC)
 
 def main() -> None:
     parser = argparse.ArgumentParser()
@@ -104,21 +119,22 @@ def main() -> None:
 
     print(f"Downloading {url} to {output}")
     req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-    with urllib.request.urlopen(req) as response:
-        if url.endswith(".zip"):
-            data = io.BytesIO(response.read())
-            with zipfile.ZipFile(data) as f:
-                f.extractall(output)
-            # Make all files executable
-            for root, _, files in os.walk(output):
-                for name in files:
-                    os.chmod(os.path.join(root, name), 0o755)
-            output.touch(mode=0o755)  # Update dir modtime
-        else:
-            with open(output, "wb") as f:
-                shutil.copyfileobj(response, f)
-            st = os.stat(output)
-            os.chmod(output, st.st_mode | stat.S_IEXEC)
+    try:
+        with urllib.request.urlopen(req) as response:
+            download(url, response, output)
+    except urllib.error.URLError:
+        try:
+            import certifi
+            import ssl
+        except:
+            import sys
+            import subprocess
+            
+            curr_py = sys.executable
+            subprocess.check_call([curr_py, '-m', 'pip', 'install', 'certifi', 'ssl'], stdout=subprocess.DEVNULL)
+            
+        with urllib.request.urlopen(req, context=ssl.create_default_context(cafile=certifi.where())) as response:
+            download(url, response, output)
 
 
 if __name__ == "__main__":
