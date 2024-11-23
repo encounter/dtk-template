@@ -122,16 +122,13 @@ def main() -> None:
     try:
         with urllib.request.urlopen(req) as response:
             download(url, response, output)
-    except urllib.error.URLError:
+    except urllib.error.URLError as e:
         try:
             import certifi
             import ssl
         except:
-            import sys
-            import subprocess
-            
-            curr_py = sys.executable
-            subprocess.check_call([curr_py, '-m', 'pip', 'install', 'certifi', 'ssl'], stdout=subprocess.DEVNULL)
+            print("\"certifi\" module not found. Please install it using \"python -m pip install certifi\".")
+            return
             
         with urllib.request.urlopen(req, context=ssl.create_default_context(cafile=certifi.where())) as response:
             download(url, response, output)
