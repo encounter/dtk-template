@@ -123,6 +123,8 @@ def main() -> None:
         with urllib.request.urlopen(req) as response:
             download(url, response, output)
     except urllib.error.URLError as e:
+        if str(e).find("CERTIFICATE_VERIFY_FAILED") == -1:
+            return
         try:
             import certifi
             import ssl
@@ -132,7 +134,6 @@ def main() -> None:
             
         with urllib.request.urlopen(req, context=ssl.create_default_context(cafile=certifi.where())) as response:
             download(url, response, output)
-
 
 if __name__ == "__main__":
     main()
