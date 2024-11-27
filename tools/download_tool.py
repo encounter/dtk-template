@@ -124,7 +124,7 @@ def main() -> None:
             download(url, response, output)
     except urllib.error.URLError as e:
         if str(e).find("CERTIFICATE_VERIFY_FAILED") == -1:
-            return
+            raise e
         try:
             import certifi
             import ssl
