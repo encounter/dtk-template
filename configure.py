@@ -158,6 +158,7 @@ config.asflags = [
     "-I include",
     f"-I build/{config.version}/include",
     f"--defsym BUILD_VERSION={version_num}",
+    f"--defsym VERSION_{config.version}",
 ]
 config.ldflags = [
     "-fp hardware",
@@ -199,6 +200,7 @@ cflags_base = [
     "-i include",
     f"-i build/{config.version}/include",
     f"-DBUILD_VERSION={version_num}",
+    f"-DVERSION_{config.version}",
 ]
 
 # Debug flags
