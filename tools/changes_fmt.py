@@ -34,7 +34,6 @@ def get_changes(changes_file: str) -> list[Change]:
     progressions = []
 
     def diff_key(object_name: str, object: dict, key: str):
-        nonlocal regressions
         from_value = object.get("from", {}).get(key, 0.0)
         to_value = object.get("to", {}).get(key, 0.0)
         key = key.removesuffix("_percent")
@@ -64,16 +63,19 @@ def generate_changes_plaintext(changes: list[Change]) -> str:
     if len(changes) == 0:
         return ""
 
-    name_max_len = max(len(name or "Total") for name, _, _, _ in changes)
+    table_total_width = 136
+    percents_max_len = 7 + 4 + 7
     key_max_len = max(len(key) for _, key, _, _ in changes)
-    name_max_len = min(100, name_max_len)
+    name_max_len = max(len(name or "Total") for name, _, _, _ in changes)
+    max_width_for_name_col = table_total_width - 3 - key_max_len - 3 - percents_max_len
+    name_max_len = min(max_width_for_name_col, name_max_len)
 
     out_lines = []
     for name, key, from_value, to_value in changes:
         if name is None:
             name = "Total"
         if len(name) > name_max_len:
-            name = name[:name_max_len]
+            name = name[: name_max_len - len("[...]")] + "[...]"
         out_lines.append(
             f"{name:>{name_max_len}} | {key:<{key_max_len}} | {from_value:6.2f}% -> {to_value:5.2f}%"
         )
