@@ -1216,6 +1216,71 @@ def generate_build_ninja(
         )
 
         ###
+        # Regression test progress reports
+        ###
+        report_baseline_path = build_path / "baseline.json"
+        report_diff_path = build_path / "report-diff.json"
+        regtest = config.tools_dir / "regtest.py"
+        regressions_out = build_path / "regressions.md"
+        n.comment(
+            "Create a baseline progress report for later match regression testing"
+        )
+        n.build(
+            outputs=report_baseline_path,
+            rule="report",
+            implicit=[objdiff, "all_source"],
+            order_only="post-build",
+        )
+        n.build(
+            outputs="baseline",
+            rule="phony",
+            inputs=report_baseline_path,
+        )
+        n.comment("Check for any match regressions against the baseline")
+        n.comment("Will fail if no baseline has been created")
+        n.rule(
+            name="changes",
+            command=f"{objdiff} report changes --format json-pretty {report_baseline_path} $in -o $out",
+            description="CHANGES",
+        )
+        n.build(
+            outputs=report_diff_path,
+            rule="changes",
+            inputs=report_path,
+            implicit=objdiff,
+        )
+        n.rule(
+            name="regtest",
+            command=f"$python {regtest} $args $in",
+            description="REGTEST",
+        )
+        n.build(
+            outputs="regtest",
+            rule="regtest",
+            inputs=report_diff_path,
+            implicit=regtest,
+        )
+        n.build(
+            outputs="regtest_all",
+            rule="regtest",
+            inputs=report_diff_path,
+            implicit=regtest,
+            variables={"args": "--all"},
+        )
+        n.rule(
+            name="regtest_file",
+            command=f"$python {regtest} $in -o $out",
+            description="REGTEST $out",
+        )
+        n.build(
+            outputs=regressions_out,
+            rule="regtest_file",
+            inputs=report_diff_path,
+            implicit=regtest,
+        )
+        n.newline()
+
+        ###
         # Helper tools
         ###
         # TODO: make these rules work for RELs too
