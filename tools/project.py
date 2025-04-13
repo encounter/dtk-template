@@ -1215,6 +1215,16 @@ def generate_build_ninja(
             order_only="post-build",
         )
 
+        n.comment("Phony edge that will always be considered dirty by ninja.")
+        n.comment(
+            "This can be used as an implicit to a target that should always be rerun, ignoring file modified times."
+        )
+        n.build(
+            outputs="always",
+            rule="phony",
+        )
+        n.newline()
+
         ###
         # Regression test progress reports
         ###
@@ -1228,7 +1238,7 @@ def generate_build_ninja(
         n.build(
             outputs=report_baseline_path,
             rule="report",
-            implicit=[objdiff, "all_source"],
+            implicit=[objdiff, "all_source", "always"],
             order_only="post-build",
         )
         n.build(
