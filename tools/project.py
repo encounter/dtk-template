@@ -1257,7 +1257,7 @@ def generate_build_ninja(
             outputs=report_changes_path,
             rule="report_changes",
             inputs=report_path,
-            implicit=objdiff,
+            implicit=[objdiff, "always"],
         )
         n.rule(
             name="changes_fmt",
