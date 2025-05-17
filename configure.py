@@ -301,6 +301,10 @@ config.progress_categories = [
     ProgressCategory("sdk", "SDK Code"),
 ]
 config.progress_each_module = args.verbose
+# Optional extra arguments to `objdiff-cli report generate`
+config.progress_report_args = [
+    "--config functionRelocDiffs=data_value",  # Enables diffing functions by their relocations and data
+]
 
 if args.mode == "configure":
     # Write build.ninja and objdiff.json
