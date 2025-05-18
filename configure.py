@@ -303,7 +303,9 @@ config.progress_categories = [
 config.progress_each_module = args.verbose
 # Optional extra arguments to `objdiff-cli report generate`
 config.progress_report_args = [
-    "--config functionRelocDiffs=data_value",  # Enables diffing functions by their relocations and data
+    # Marks relocations as mismatching if the target value is different
+    # Default is "functionRelocDiffs=none", which is most lenient
+    # "--config functionRelocDiffs=data_value",
 ]
 
 if args.mode == "configure":
