@@ -1213,7 +1213,7 @@ def generate_build_ninja(
         n.build(
             outputs=report_path,
             rule="report",
-            implicit=[objdiff, "all_source"],
+            implicit=[objdiff, "all_source", configure_script],
             order_only="post-build",
         )
 
