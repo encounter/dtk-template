@@ -11,6 +11,7 @@
 ###
 
 import argparse
+import fnmatch
 import os
 import re
 from typing import List
@@ -19,6 +20,7 @@ script_dir = os.path.dirname(os.path.realpath(__file__))
 root_dir = os.path.abspath(os.path.join(script_dir, ".."))
 src_dir = os.path.join(root_dir, "src")
 include_dirs: List[str] = []  # Set with -I flag
+exclude_globs: List[str] = []  # Set with -x flag
 
 include_pattern = re.compile(r'^#\s*include\s*[<"](.+?)[>"]')
 guard_pattern = re.compile(r"^#\s*ifndef\s+(.*)$")
@@ -56,6 +58,7 @@ def import_c_file(in_file: str) -> str:
 
 
 def process_file(in_file: str, lines: List[str]) -> str:
+    print(f"process_file: {in_file}")
     out_text = ""
     for idx, line in enumerate(lines):
         if idx == 0:
@@ -73,8 +76,17 @@ def process_file(in_file: str, lines: List[str]) -> str:
             print("Processing file", in_file)
         include_match = include_pattern.match(line.strip())
         if include_match and not include_match[1].endswith(".s"):
+            excluded = False
+            for glob in exclude_globs:
+                if fnmatch.fnmatch(include_match[1], glob):
+                    excluded = True
+                    break
+
             out_text += f'/* "{in_file}" line {idx} "{include_match[1]}" */\n'
-            out_text += import_h_file(include_match[1], os.path.dirname(in_file))
+            if excluded:
+                out_text += f'/* Skipped excluded file */\n'
+            else:
+                out_text += import_h_file(include_match[1], os.path.dirname(in_file))
             out_text += f'/* end "{include_match[1]}" */\n'
         else:
             out_text += line
@@ -111,12 +123,20 @@ def main():
         help="""Include directory""",
         action="append",
     )
+    parser.add_argument(
+        "-x",
+        "--exclude",
+        help="""Excluded file name glob""",
+        action="append",
+    )
     args = parser.parse_args()
 
     if args.include is None:
         exit("No include directories specified")
     global include_dirs
     include_dirs = args.include
+    global exclude_globs
+    exclude_globs = args.exclude or []
     output = import_c_file(args.c_file)
 
     with open(os.path.join(root_dir, args.output), "w", encoding="utf-8") as f:
