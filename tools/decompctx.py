@@ -30,6 +30,22 @@ defines = set()
 deps = []
 
 
+def generate_prelude(defines) -> str:
+    out_text = ""
+    if len(defines) > 0:
+        out_text += "/* decompctx prelude */\n"
+    for define in defines:
+        if define.count("=") > 0:
+            macro_name, macro_val = define.split("=", 1)
+            out_text += f"#define {macro_name} {macro_val}\n"
+        else:
+            out_text += f"#define {define}\n"
+    if len(defines) > 0:
+        out_text += "/* end decompctx prelude */\n\n"
+
+    return out_text
+
+
 def import_h_file(in_file: str, r_path: str) -> str:
     rel_path = os.path.join(root_dir, r_path, in_file)
     if os.path.exists(rel_path):
@@ -129,6 +145,12 @@ def main():
         help="""Excluded file name glob""",
         action="append",
     )
+    parser.add_argument(
+        "-D",
+        "--define",
+        help="""Macro definition""",
+        action="append",
+    )
     args = parser.parse_args()
 
     if args.include is None:
@@ -137,7 +159,9 @@ def main():
     include_dirs = args.include
     global exclude_globs
     exclude_globs = args.exclude or []
-    output = import_c_file(args.c_file)
+    prelude_defines = args.define or []
+    output = generate_prelude(prelude_defines)
+    output += import_c_file(args.c_file)
 
     with open(os.path.join(root_dir, args.output), "w", encoding="utf-8") as f:
         f.write(output)
