@@ -31,17 +31,18 @@ deps = []
 
 
 def generate_prelude(defines) -> str:
-    out_text = ""
-    if len(defines) > 0:
-        out_text += "/* decompctx prelude */\n"
+    if len(defines) == 0:
+        return ""
+
+    out_text = "/* decompctx prelude */\n"
     for define in defines:
-        if define.count("=") > 0:
-            macro_name, macro_val = define.split("=", 1)
+        parts = define.split("=", 1)
+        if len(parts) == 2:
+            macro_name, macro_val = parts
             out_text += f"#define {macro_name} {macro_val}\n"
         else:
-            out_text += f"#define {define}\n"
-    if len(defines) > 0:
-        out_text += "/* end decompctx prelude */\n\n"
+            out_text += f"#define {parts[0]}\n"
+    out_text += "/* end decompctx prelude */\n\n"
 
     return out_text
 
@@ -74,7 +75,6 @@ def import_c_file(in_file: str) -> str:
 
 
 def process_file(in_file: str, lines: List[str]) -> str:
-    print(f"process_file: {in_file}")
     out_text = ""
     for idx, line in enumerate(lines):
         if idx == 0:
@@ -100,7 +100,7 @@ def process_file(in_file: str, lines: List[str]) -> str:
 
             out_text += f'/* "{in_file}" line {idx} "{include_match[1]}" */\n'
             if excluded:
-                out_text += f'/* Skipped excluded file */\n'
+                out_text += "/* Skipped excluded file */\n"
             else:
                 out_text += import_h_file(include_match[1], os.path.dirname(in_file))
             out_text += f'/* end "{include_match[1]}" */\n'

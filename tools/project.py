@@ -198,11 +198,11 @@ class ProjectConfig:
         self.link_order_callback: Optional[Callable[[int, List[str]], List[str]]] = (
             None  # Callback to add/remove/reorder units within a module
         )
-        self.context_exclude_globs: Optional[List[str]] = (
-            None  # Globs to exclude from context files
+        self.context_exclude_globs: List[str] = (
+            []  # Globs to exclude from context files
         )
-        self.context_defines: Optional[List[str]] = (
-            None  # Macros to define at the top of context files
+        self.context_defines: List[str] = (
+            []  # Macros to define at the top of context files
         )
 
         # Progress output and report.json config
@@ -1054,11 +1054,8 @@ def generate_build_ninja(
                     ):
                         include_dirs.append(flag[3:])
                 includes = " ".join([f"-I {d}" for d in include_dirs])
-
-                excludes = " ".join(
-                    [f"-x {d}" for d in config.context_exclude_globs] if config.context_exclude_globs else [])
-
-                defines = " ".join([f"-D {d}" for d in config.context_defines] if config.context_defines else [])
+                excludes = " ".join([f"-x {d}" for d in config.context_exclude_globs])
+                defines = " ".join([f"-D {d}" for d in config.context_defines])
 
                 n.build(
                     outputs=obj.ctx_path,
