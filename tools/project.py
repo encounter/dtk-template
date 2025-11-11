@@ -283,8 +283,8 @@ class ProjectConfig:
     def use_wibo(self) -> bool:
         return (
             self.wibo_tag is not None
-            and sys.platform == "linux"
-            and platform.machine() in ("i386", "x86_64")
+            and (sys.platform == "linux" or sys.platform == "darwin")
+            and platform.machine() in ("i386", "x86_64", "aarch64", "arm64")
             and self.wrapper is None
         )
 
@@ -595,10 +595,7 @@ def generate_build_ninja(
         sys.exit("ProjectConfig.sjiswrap_tag missing")
 
     wrapper = config.compiler_wrapper()
-    # Only add an implicit dependency on wibo if we download it
-    wrapper_implicit: Optional[Path] = None
     if wrapper is not None and config.use_wibo():
-        wrapper_implicit = wrapper
         n.build(
             outputs=wrapper,
             rule="download_tool",
@@ -608,6 +605,11 @@ def generate_build_ninja(
                 "tag": config.wibo_tag,
             },
         )
+
+    wrapper_implicit: Optional[Path] = None
+    if wrapper is not None and (wrapper.exists() or config.use_wibo()):
+        wrapper_implicit = wrapper
+
     wrapper_cmd = f"{wrapper} " if wrapper else ""
 
     compilers = config.compilers()
