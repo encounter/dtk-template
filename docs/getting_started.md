@@ -40,6 +40,18 @@ If the game uses [common BSS](common_bss.md), be sure to set `common_start` as w
 
 Once the initial analysis is completed, `symbols.txt` and `splits.txt` will be generated from the map information. **Remove** the `map` fields from `config.yml` to avoid conflicts.
 
+## Using an `.elf`
+
+If the game has an `.elf` file (matching the DOL after running `dtk elf2dol` on it) then you can run the following to generate a config:
+
+```sh
+dtk elf config game.elf config/GAMEID
+```
+
+However, the splits _will_ be wrong, so the recommended move is to use the `symbols.txt` file that was generated, and copy the generated splits to a blank `splits.txt` as needed.
+
+If the game has an `.elf` file that _doesn't_ match the DOL, the info will still be useful, but you'll have to manually map the symbols over to your game version. Alternatively, you could base the project on the DOL created from that `.elf` instead.
+
 ## Post-analysis
 
 After the initial analysis, `symbols.txt` and `splits.txt` will be generated. These files can be modified to adjust symbols and split points.
