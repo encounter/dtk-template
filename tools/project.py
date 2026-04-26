@@ -1543,8 +1543,14 @@ def generate_build_ninja(
         n.default(build_config_path)
 
     # Write build.ninja
+    ninja_text = out.getvalue()
+    # Fix: on Windows+MSYS2, /bin/sh interprets backslashes in paths as
+    # escape characters (e.g. backslash followed by 0 becomes a NUL escape).
+    # Normalize all paths in build.ninja to forward slashes -- Windows tools
+    # accept both, and bash leaves them alone.
+    ninja_text = ninja_text.replace(chr(92), "/")
     with open("build.ninja", "w", encoding="utf-8") as f:
-        f.write(out.getvalue())
+        f.write(ninja_text)
     out.close()
 
 
