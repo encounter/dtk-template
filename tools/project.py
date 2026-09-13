@@ -1985,7 +1985,10 @@ def generate_compile_commands(
 
         def default_format(o):
             if isinstance(o, Path):
-                return o.resolve().as_posix()
+                s = o.resolve().as_posix()
+                if is_windows() and len(s) > 1 and s[1] == ":":
+                    return s[0].lower() + s[1:]
+                return s
             return str(o)
 
         json.dump(clangd_config, w, indent=2, default=default_format)
