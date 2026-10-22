@@ -132,6 +132,11 @@ parser.add_argument(
     action="store_false",
     help="disable progress calculation",
 )
+parser.add_argument(
+    "--portable-build-ninja",
+    action="store_true",
+    help="use relative paths for build.ninja, so the build directory can be moved",
+)
 args = parser.parse_args()
 
 config = ProjectConfig()
@@ -145,6 +150,7 @@ config.objdiff_path = args.objdiff
 config.binutils_path = args.binutils
 config.compilers_path = args.compilers
 config.generate_map = args.map
+config.portable_build_ninja = args.portable_build_ninja
 config.non_matching = args.non_matching
 config.sjiswrap_path = args.sjiswrap
 config.ninja_path = args.ninja

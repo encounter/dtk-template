@@ -164,6 +164,9 @@ class ProjectConfig:
         self.check_sha_path: Optional[Path] = None  # Path to version.sha1
         self.config_path: Optional[Path] = None  # Path to config.yml
         self.generate_map: bool = False  # Generate map file(s)
+        self.portable_build_ninja: bool = (
+            False  # Use relative paths so build outputs can move between machines
+        )
         self.asflags: Optional[List[str]] = None  # Assembler flags
         self.ldflags: Optional[List[str]] = None  # Linker flags
         self.libs: Optional[List[Library]] = None  # List of libraries
@@ -363,6 +366,9 @@ def get_pch_out_name(config: ProjectConfig, pch: PrecompiledHeader) -> str:
     #
     # Without this any object which includes the PCH would depend on the .mch filesystem entry but not the
     # corresponding Ninja task, so the MCH would not be implicitly rebuilt when the PCH is modified.
+    if config.portable_build_ninja:
+        # Depfiles are made relative, so the relative path matches them.
+        return str(config.out_path() / "include" / pch_out_name)
     return os.path.abspath(config.out_path() / "include" / pch_out_name)
 
 
@@ -468,7 +474,13 @@ def generate_build_ninja(
     python_lib_dir = python_lib.parent
     n.comment("The arguments passed to configure.py, for rerunning it.")
     n.variable("configure_args", sys.argv[1:])
-    n.variable("python", f'"{sys.executable}"')
+    python_exe = sys.executable
+    if config.portable_build_ninja:
+        try:
+            python_exe = os.path.relpath(python_exe)
+        except ValueError:
+            pass  # Different drive on Windows
+    n.variable("python", f'"{python_exe}"')
     n.newline()
 
     ###
@@ -704,14 +716,22 @@ def generate_build_ninja(
     # include macros.inc directly as an implicit dependency
     gnu_as_implicit.append(build_path / "include" / "macros.inc")
 
-    if os.name != "nt":
+    if os.name != "nt" or config.portable_build_ninja:
         transform_dep = config.tools_dir / "transform_dep.py"
-        mwcc_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_sjis_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_pch_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_pch_sjis_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_extab_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_sjis_extab_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
+        transform_dep_args = " --relative" if config.portable_build_ninja else ""
+        transform_dep_cmd = (
+            f" && $python {transform_dep} $basefile.d $basefile.d{transform_dep_args}"
+        )
+
+        def chain(cmd: str) -> str:
+            return cmd if cmd.startswith(CHAIN) else f"{CHAIN}{cmd}"
+
+        mwcc_cmd = chain(mwcc_cmd) + transform_dep_cmd
+        mwcc_sjis_cmd = chain(mwcc_sjis_cmd) + transform_dep_cmd
+        mwcc_pch_cmd = chain(mwcc_pch_cmd) + transform_dep_cmd
+        mwcc_pch_sjis_cmd = chain(mwcc_pch_sjis_cmd) + transform_dep_cmd
+        mwcc_extab_cmd += transform_dep_cmd
+        mwcc_sjis_extab_cmd += transform_dep_cmd
         mwcc_implicit.append(transform_dep)
         mwcc_sjis_implicit.append(transform_dep)
         mwcc_pch_implicit.append(transform_dep)
