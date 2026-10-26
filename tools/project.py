@@ -359,11 +359,7 @@ def make_flags_str(flags: Optional[List[str]]) -> str:
 def get_pch_out_name(config: ProjectConfig, pch: PrecompiledHeader) -> str:
     pch_rel_path = Path(pch["source"])
     pch_out_name = pch_rel_path.with_suffix(".mch")
-    # Use absolute path as a workaround to allow this target to be matched with absolute paths in depfiles.
-    #
-    # Without this any object which includes the PCH would depend on the .mch filesystem entry but not the
-    # corresponding Ninja task, so the MCH would not be implicitly rebuilt when the PCH is modified.
-    return os.path.abspath(config.out_path() / "include" / pch_out_name)
+    return (config.out_path() / "include" / pch_out_name).as_posix()
 
 
 # Unit configuration
@@ -468,7 +464,10 @@ def generate_build_ninja(
     python_lib_dir = python_lib.parent
     n.comment("The arguments passed to configure.py, for rerunning it.")
     n.variable("configure_args", sys.argv[1:])
-    n.variable("python", f'"{sys.executable}"')
+    python_exe = Path(sys.executable).absolute()
+    if python_exe.is_relative_to(Path.cwd()):
+        python_exe = python_exe.relative_to(Path.cwd())
+    n.variable("python", f'"{python_exe.as_posix()}"')
     n.newline()
 
     ###
@@ -704,20 +703,26 @@ def generate_build_ninja(
     # include macros.inc directly as an implicit dependency
     gnu_as_implicit.append(build_path / "include" / "macros.inc")
 
-    if os.name != "nt":
-        transform_dep = config.tools_dir / "transform_dep.py"
-        mwcc_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_sjis_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_pch_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_pch_sjis_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_extab_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_sjis_extab_cmd += f" && $python {transform_dep} $basefile.d $basefile.d"
-        mwcc_implicit.append(transform_dep)
-        mwcc_sjis_implicit.append(transform_dep)
-        mwcc_pch_implicit.append(transform_dep)
-        mwcc_pch_sjis_implicit.append(transform_dep)
-        mwcc_extab_implicit.append(transform_dep)
-        mwcc_sjis_extab_implicit.append(transform_dep)
+    transform_dep: Path = config.tools_dir / "transform_dep.py"
+    transform_dep_cmd = (
+        f" && $python {transform_dep} $basefile.d $basefile.d"
+    )
+
+    def chain(cmd: str) -> str:
+        return cmd if cmd.startswith(CHAIN) else f"{CHAIN}{cmd}"
+
+    mwcc_cmd = chain(mwcc_cmd) + transform_dep_cmd
+    mwcc_sjis_cmd = chain(mwcc_sjis_cmd) + transform_dep_cmd
+    mwcc_pch_cmd = chain(mwcc_pch_cmd) + transform_dep_cmd
+    mwcc_pch_sjis_cmd = chain(mwcc_pch_sjis_cmd) + transform_dep_cmd
+    mwcc_extab_cmd += transform_dep_cmd
+    mwcc_sjis_extab_cmd += transform_dep_cmd
+    mwcc_implicit.append(transform_dep)
+    mwcc_sjis_implicit.append(transform_dep)
+    mwcc_pch_implicit.append(transform_dep)
+    mwcc_pch_sjis_implicit.append(transform_dep)
+    mwcc_extab_implicit.append(transform_dep)
+    mwcc_sjis_extab_implicit.append(transform_dep)
 
     n.comment("Link ELF file")
     n.rule(

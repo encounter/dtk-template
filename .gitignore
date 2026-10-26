@@ -21,6 +21,7 @@ orig/*/*
 build/
 .ninja_*
 build.ninja
+.venv/
 
 # decompctx output
 ctx.*

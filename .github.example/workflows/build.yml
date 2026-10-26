@@ -20,53 +20,74 @@ jobs:
     steps:
     # Checkout the repository
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         fetch-depth: 0
         submodules: recursive
-
-    # Set Git config
-    - name: Git config
-      run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-    # Normalize file mod times
-    - name: Restore timestamps
-      run: |
-        uv run https://raw.githubusercontent.com/MestreLion/git-tools/refs/tags/v2022.12/git-restore-mtime \
-            --merge --commit-time
 
     # Copy the original files to the workspace
     - name: Prepare
       run: cp -a /orig .
 
-    # Restore cached files
-    - name: Cache build
-      uses: actions/cache@v4
+    # Restore cached files.
+    - name: Restore build cache
+      id: cache
+      uses: actions/cache/restore@v6
       with:
         path: |
           build
           .ninja_deps
           .ninja_log
-        key: ${{ runner.os }}-${{ matrix.version }}-${{ github.sha }}
-        restore-keys: ${{ runner.os }}-${{ matrix.version }}-
+        key: build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.version }}-${{ github.sha }}
+        restore-keys: build-v3-${{ runner.os }}-${{ runner.arch }}-${{ matrix.version }}-
+
+    # Ninja rebuilds an output only when an input is newer than it. Checkout gives
+    # every file the current time; files whose content matches the cached build get
+    # an old fixed time instead, so only changed files are newer than cached objects.
+    - name: Mark unchanged sources
+      run: |
+        if [ ! -f build/sources.txt ]; then
+          echo "No build/sources.txt in the restored cache; every file keeps its checkout time"
+          exit 0
+        fi
+        git ls-files -s --recurse-submodules > "$RUNNER_TEMP/sources.txt"
+        awk -F '\t' 'NR == FNR { cached[$0]; next } $0 in cached { print $2 }' \
+          build/sources.txt "$RUNNER_TEMP/sources.txt" > "$RUNNER_TEMP/unchanged.txt"
+        echo "Marking $(wc -l < "$RUNNER_TEMP/unchanged.txt") of $(wc -l < "$RUNNER_TEMP/sources.txt") files unchanged"
+        echo "::group::Changed since the cached build"
+        awk -F '\t' 'NR == FNR { cached[$0]; next } !($0 in cached) { print $2 }' \
+          build/sources.txt "$RUNNER_TEMP/sources.txt"
+        echo "::endgroup::"
+        tr '\n' '\0' < "$RUNNER_TEMP/unchanged.txt" | xargs -0 -r touch -t 200001010000 --
 
     # Build the project
     - name: Build
       run: |
-        python configure.py --map --version ${{ matrix.version }} \
-            --binutils /binutils --compilers /compilers
+        python -m venv .venv
+        .venv/bin/python configure.py --map --version ${{ matrix.version }}
         ninja all_source progress build/${{ matrix.version }}/report.json
+        git ls-files -s --recurse-submodules > build/sources.txt
+
+    - name: Save build cache
+      uses: actions/cache/save@v6
+      if: ${{ github.ref == 'refs/heads/main' }}
+      with:
+        path: |
+          build
+          .ninja_deps
+          .ninja_log
+        key: ${{ steps.cache.outputs.cache-primary-key }}
 
     # Upload map files
     - name: Upload map
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.version }}_maps
         path: build/${{ matrix.version }}/**/*.MAP
 
     # Upload progress report
     - name: Upload report
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ matrix.version }}_report
         path: build/${{ matrix.version }}/report.json
