@@ -36,9 +36,9 @@ The contents of this section follow a very simple format:
 
 `[0x0 size: 0xB]` Magic: `43 6F 64 65 57 61 72 72 69 6F 72` ("CodeWarrior")  
 
-`[0xB size: 0x1]` Version(?): `XX`
+`[0xB size: 0x1]` Version: `XX`
 
-It's not known whether this field actually affects `mwld` in any way, but it's configurable for completeness sake. (See `mw_comment_version` in [`config.example.yml`](/config/GAMEID/config.example.yml).)
+`mwld` checks it: for example, it only reads symbol entries for version 6 and later. It's configurable for completeness sake. (See `mw_comment_version` in [`config.example.yml`](/config/GAMEID/config.example.yml).)
 
 Known values:
 
@@ -50,7 +50,11 @@ Known values:
 `[0xC size: 0x4]` Compiler version: `XX XX XX XX`
 
 First 3 bytes are major, minor, and patch version numbers.  
-4th byte is unknown, but is always `01`.
+4th byte is the producer:
+
+- `01` - Compiler
+- `02` - Linker, unoptimized partial link
+- `03` - Linker, optimized partial link
 
 Example: `Version 2.3.3 build 144` -> `02 03 00 01`  
 Often the `.exe`'s properties (which `--help` reads from) and the internal version number (here) will differ.
@@ -68,7 +72,7 @@ Often the `.exe`'s properties (which `--help` reads from) and the internal versi
 
 `[0x12 size: 2]` Processor type: `00 16` (Gekko)
 
-`[0x14 size: 1]` Unknown, always `2C`. Possibly the start of symbol entries.
+`[0x14 size: 1]` Header size: `2C`. `mwld` reads the first symbol entry at this offset.
 
 `[0x15 size: 1]` "Quirk" flags: `XX`
 
@@ -82,7 +86,7 @@ Bitfield of miscellaneous flags. Known flags:
 
 ### Symbol entry
 
-At `0x2C` is the first symbol entry. There is one 8 byte entry per ELF symbol.
+At `0x2C` is the first symbol entry. There is one 8 byte entry per ELF symbol, in symbol table order.
 
 This includes the "null" ELF symbol, so the first entry will be all 0's.
 
@@ -93,19 +97,22 @@ This includes the "null" ELF symbol, so the first entry will be all 0's.
 Known values:
 
 - `00` - Default
-- `0D` - Weak
-- `0E` - Unknown, also weak?
+- `0D` - Weak ("multidef"), e.g. inline functions and vtables
+- `0E` - Weak ("overload"), e.g. template instances and `__declspec(weak)` functions
 
-`[0x5 size: 1]` Active flags(?): `XX`
+`[0x5 size: 1]` Active flags: `XX`
 
-Known values:
+Bitfield. Known flags:
 
-- `00` - Default
-- `08` - Force active / export. Prevents the symbol from being deadstripped.  
-  When applied on a section symbol, the entire section is kept as-is. This is used
-  by `mwcc` when data pooling is triggered (indicated by a symbol like `...data.0`), likely to prevent the hard-coded section-relative offsets from breaking.  
+- `01` - Not built by CodeWarrior. `mwld` assigns this to every symbol of an object without a `.comment` section of version 6 or later.
+- `02` - Export (not seen in compiler output)
+- `04` - Internal (not seen in compiler output)
+- `08` - Force active. Prevents the symbol from being deadstripped.  
+  When applied on a section symbol, the entire section is kept as-is.  
   Can also be set using `#pragma force_active on` or `__declspec(export)`.
-- `10` - Unknown
+- `10` - Pooled data anchor. Set by `mwcc` on the local symbol that marks the start of pooled data
+  (e.g. `...data.0`, `...rodata.0`, `...bss.0`). Code addresses the pooled objects as offsets from this symbol.
+  If the flag is cleared, `mwld` can deadstrip objects that are only reached this way.
 - `20` - Unknown
 
 `[0x6 size: 2]` Padding(?): `00 00`
