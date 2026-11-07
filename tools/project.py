@@ -192,7 +192,7 @@ class ProjectConfig:
             None  # Custom ninja build rules
         )
         self.custom_build_steps: Optional[Dict[str, List[Dict[str, Any]]]] = (
-            None  # Custom build steps, types are ["pre-compile", "post-compile", "post-link", "post-build"]
+            None  # Custom build steps, types are ["pre-compile", "post-compile", "post-link", "post-build", "post-ok"]
         )
         self.generate_compile_commands: bool = (
             True  # Generate compile_commands.json for clangd
@@ -1330,6 +1330,9 @@ def generate_build_ninja(
         )
         n.newline()
 
+        # Add all build steps needed before progress and after checking the hash
+        write_custom_step("post-ok", "post-build")
+
         ###
         # Calculate progress
         ###
@@ -1343,12 +1346,11 @@ def generate_build_ninja(
             outputs="progress",
             rule="progress",
             implicit=[
-                ok_path,
                 configure_script,
                 python_lib,
                 report_path,
             ],
-            order_only="post-build",
+            order_only="post-ok",
         )
 
         ###
