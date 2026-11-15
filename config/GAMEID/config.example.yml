@@ -121,9 +121,15 @@ skip_cfa_ranges:
 # (optional) Configuration for modules.
 modules:
 
-- # Path to the module.
+- # Path to the module (REL or RSO).
   # Relative to `object_base` if set, otherwise relative to the root of the project.
   object: files/module.rel
+
+  # (optional) Module format: `rel` or `rso`. Defaults to the file extension of `object`.
+  # kind: rel
+
+  # (RSO only, optional) Unique, non-zero ID for the module.
+  # module_id: 1
 
   # (optional) SHA-1 hash of the module for verification.
   hash: 0123456789abcdef0123456789abcdef01234567
@@ -151,7 +157,7 @@ modules:
   # See https://github.com/encounter/decomp-toolkit/blob/main/assets/ldscript_partial.lcf
   ldscript_template: config/GAMEID/module/ldscript.tpl
 
-  # (optional) By default, every REL is linked with every other REL.
+  # (REL only, optional) By default, every REL is linked with every other REL.
   # Some games link RELs individually, so the module IDs are not unique.
   # To support this, `links` overrides which other modules are included in this module's analysis.
   # The DOL is always included, and does not need to be specified.

@@ -12,7 +12,7 @@ See [Dependencies](dependencies.md) first.
 
    - **Extracted files:** In Dolphin, use "Extract Entire Disc" for GameCube games, or use "Data Partition" -> "Extract Entire Partition" for Wii games.
 
-4. Rename `config/GAMEID` to the game's ID and modify `config/[GAMEID]/config.yml` appropriately, using [`config.example.yml`](/config/GAMEID/config.example.yml) as a reference. If the game doesn't use RELs, the `modules` list in `config.yml` can be removed.
+4. Rename `config/GAMEID` to the game's ID and modify `config/[GAMEID]/config.yml` appropriately, using [`config.example.yml`](/config/GAMEID/config.example.yml) as a reference. If the game doesn't use RELs or RSOs, the `modules` list in `config.yml` can be removed. For Wii games with RSOs, `dtk dol config main.dol selfile.sel *.rso -o config.yml` generates the `selfile` and `modules` entries.
 
 5. Generate a `config/[GAMEID]/build.sha1` file for verification. This file is a list of SHA-1 hashes for each build artifact. One possible way:
 
@@ -20,7 +20,7 @@ See [Dependencies](dependencies.md) first.
     dtk shasum orig/[GAMEID]/sys/main.dol orig/[GAMEID]/files/*.rel -o config/[GAMEID]/build.sha1
     ```
 
-6. Modify the paths in `config/[GAMEID]/build.sha1` to point to the `build` directory instead of `orig`. The DOL will be built at `build/[GAMEID]/main.dol`, and modules will be built at `build/[GAMEID]/[module_name]/[module_name].rel`.
+6. Modify the paths in `config/[GAMEID]/build.sha1` to point to the `build` directory instead of `orig`. The DOL will be built at `build/[GAMEID]/main.dol`, and modules will be built at `build/[GAMEID]/[module_name]/[module_name].rel` (or `.rso`). If the game has a `selfile.sel`, it will be built at `build/[GAMEID]/selfile.sel`.
 
 7. Update `VERSIONS` in [`configure.py`](/configure.py) with the game ID.
 
